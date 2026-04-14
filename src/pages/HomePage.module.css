@@ -1,0 +1,27 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 64px 0 48px;
+}
+
+.title {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--color-neutral-900);
+}
+
+.subtitle {
+  font-size: 1.125rem;
+  color: var(--color-neutral-500);
+  line-height: 1.6;
+  max-width: 480px;
+}
