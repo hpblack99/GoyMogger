@@ -8,14 +8,14 @@ export default function Navbar() {
     <header className={styles.header}>
       <nav className={styles.nav}>
         <Link to="/" className={styles.logo}>
-          App
+          FreightQuote
         </Link>
         <div className={styles.links}>
           <Link
             to="/"
             className={`${styles.link} ${location.pathname === '/' ? styles.active : ''}`}
           >
-            Home
+            Get a Quote
           </Link>
         </div>
       </nav>
