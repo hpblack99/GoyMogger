@@ -1,11 +1,11 @@
 """
 FFE website automation using Playwright (Python).
-All selectors and URLs are in ffe-selectors.json — edit that file to fix issues.
-Set DEBUG=true in your .env to run with a visible browser window.
-Screenshots are saved to python/screenshots/ at every key step.
+Selectors and URLs live in ffe-selectors.json — edit that file when the site changes.
+Set DEBUG=true in .env to run with a visible browser. Screenshots saved to python/screenshots/.
 """
 
 import json
+import re
 import time
 from datetime import datetime
 from pathlib import Path
@@ -15,59 +15,49 @@ CONFIG = json.loads((Path(__file__).parent / "ffe-selectors.json").read_text())
 SCREENSHOT_DIR = Path(__file__).parent / "screenshots"
 SCREENSHOT_DIR.mkdir(exist_ok=True)
 
-DELAY_BETWEEN_QUOTES = 1.5  # seconds — be polite to the server
+# Internal FFE class select IDs, from the live DOM of /Customer/RateRequest
+CLASS_ID_MAP: dict[str, str] = CONFIG["class_id_map"]
+
+# Seconds between quotes — be polite to the server
+DELAY_BETWEEN_QUOTES = 1.5
 
 
 def _screenshot(page: Page, name: str) -> None:
     try:
-        path = SCREENSHOT_DIR / f"{name}-{datetime.now().strftime('%H%M%S%f')}.png"
-        page.screenshot(path=str(path), full_page=True)
+        ts = datetime.now().strftime("%H%M%S%f")
+        page.screenshot(path=str(SCREENSHOT_DIR / f"{name}-{ts}.png"), full_page=True)
     except Exception:
         pass
 
 
-def _try_fill(page: Page, selector: str, value: str) -> bool:
-    """Try each comma-separated selector until one works."""
-    for sel in [s.strip() for s in selector.split(",")]:
-        try:
-            el = page.query_selector(sel)
-            if el:
-                el.fill(value)
-                return True
-        except Exception:
-            continue
-    return False
-
-
-def _try_select_or_fill(page: Page, selector: str, value: str) -> bool:
-    """For <select> elements select by value/label; for inputs, fill."""
-    for sel in [s.strip() for s in selector.split(",")]:
-        try:
-            el = page.query_selector(sel)
-            if not el:
-                continue
-            tag = el.evaluate("e => e.tagName.toLowerCase()")
-            if tag == "select":
-                for attempt in [
-                    lambda: page.select_option(sel, value=value),
-                    lambda: page.select_option(sel, label=value),
-                    lambda: page.select_option(sel, label=f"Class {value}"),
-                    lambda: page.select_option(sel, value=f"Class {value}"),
-                ]:
-                    try:
-                        attempt()
-                        return True
-                    except Exception:
-                        continue
-            else:
-                el.fill(value)
-                return True
-        except Exception:
-            continue
-    return False
+def _resolve_class_id(freight_class: str) -> str:
+    """
+    Convert a user-supplied freight class (e.g. '100', 'Class 100', '77.5')
+    to FFE's internal select option value.
+    Raises ValueError if the class is not in the mapping.
+    """
+    raw = str(freight_class).strip()
+    # Strip common prefixes like "Class " or "class"
+    cleaned = re.sub(r"(?i)^class\s*", "", raw).strip()
+    if cleaned in CLASS_ID_MAP:
+        return CLASS_ID_MAP[cleaned]
+    # Try rounding .0 suffix (e.g. "100.0" → "100")
+    try:
+        as_float = float(cleaned)
+        rounded = str(int(as_float)) if as_float == int(as_float) else str(as_float)
+        if rounded in CLASS_ID_MAP:
+            return CLASS_ID_MAP[rounded]
+    except ValueError:
+        pass
+    valid = sorted(CLASS_ID_MAP.keys(), key=float)
+    raise ValueError(
+        f"Unknown freight class '{freight_class}'. "
+        f"Valid classes: {', '.join(valid)}"
+    )
 
 
 def _get_text(page: Page, selector: str) -> str | None:
+    """Try each comma-separated selector; return first non-empty text."""
     for sel in [s.strip() for s in selector.split(",")]:
         try:
             el = page.query_selector(sel)
@@ -92,7 +82,7 @@ class FFEQuoter:
         self._playwright = sync_playwright().start()
         self._browser = self._playwright.chromium.launch(
             headless=not self.debug,
-            slow_mo=250 if self.debug else 0,
+            slow_mo=300 if self.debug else 0,
         )
         self._context = self._browser.new_context(
             viewport={"width": 1280, "height": 900},
@@ -149,44 +139,27 @@ class FFEQuoter:
         print(f"[FFE] Logged in. URL: {self.page.url}")
 
     # ─────────────────────────────────────────────────────────────────────────
-    # Navigate to rate quote page
+    # Navigate to rate request page
     # ─────────────────────────────────────────────────────────────────────────
 
-    def navigate_to_rate_quote(self) -> None:
-        print("[FFE] Navigating to rate quote page…")
-        self.page.goto(CONFIG["urls"]["rate_quote"], wait_until="networkidle", timeout=30_000)
-        _screenshot(self.page, "04-rate-quote-attempt")
+    def navigate_to_rate_request(self) -> None:
+        print("[FFE] Navigating to Rate Request…")
+        self.page.goto(CONFIG["urls"]["rate_request"], wait_until="networkidle", timeout=30_000)
+        _screenshot(self.page, "04-rate-request")
 
         if "/Account/Login" in self.page.url:
             raise RuntimeError("Redirected to login — session expired.")
 
-        title = self.page.title().lower()
-        if "not found" not in title and "error" not in title and "404" not in title:
-            print(f'[FFE] Rate quote page loaded: "{self.page.title()}"')
-            return
+        # Verify the form is present
+        origin_el = self.page.query_selector(CONFIG["quote_form"]["origin_zip"])
+        if not origin_el:
+            _screenshot(self.page, "04-rate-request-missing-form")
+            raise RuntimeError(
+                f"Rate Request form not found at {self.page.url}. "
+                "Check the URL or update ffe-selectors.json → quote_form."
+            )
 
-        # Fall back: scan customer portal for a rate quote link
-        print("[FFE] Direct URL failed — searching customer portal for rate quote link…")
-        self.page.goto(CONFIG["urls"]["customer_portal"], wait_until="networkidle", timeout=30_000)
-        _screenshot(self.page, "04b-customer-portal")
-
-        for text in CONFIG["rate_quote_link_text"]:
-            link = self.page.query_selector(f'a:has-text("{text}")')
-            if link:
-                print(f'[FFE] Found link: "{text}"')
-                with self.page.expect_navigation(wait_until="networkidle", timeout=30_000):
-                    link.click()
-                _screenshot(self.page, "04c-rate-page-via-link")
-                return
-
-        _screenshot(self.page, "04d-link-not-found")
-        raise RuntimeError(
-            f"Could not find the rate quote page.\n"
-            f"Tried URL: {CONFIG['urls']['rate_quote']}\n"
-            f"Then searched for links: {CONFIG['rate_quote_link_text']}\n"
-            f"Screenshots saved to: python/screenshots/\n"
-            f"Fix 'urls.rate_quote' in python/ffe-selectors.json and retry."
-        )
+        print(f'[FFE] Rate Request loaded: "{self.page.title()}"')
 
     # ─────────────────────────────────────────────────────────────────────────
     # Get a single quote
@@ -194,43 +167,57 @@ class FFEQuoter:
 
     def get_quote(self, row: dict) -> dict:
         """
-        row keys: origin_zip, dest_zip, weight, freight_class, pieces (optional)
-        Returns dict with: rate, transit_days, quote_number (any may be None)
+        row keys: origin_zip, dest_zip, weight, freight_class, pieces (optional), row_index
+        Returns: {rate, transit_days, quote_number}  — any field may be None on parse failure
         """
-        self.page.goto(CONFIG["urls"]["rate_quote"], wait_until="networkidle", timeout=30_000)
+        # Fresh form for every quote
+        self.page.goto(CONFIG["urls"]["rate_request"], wait_until="networkidle", timeout=30_000)
 
         cfg = CONFIG["quote_form"]
-        filled = {
-            "origin_zip":    _try_fill(self.page, cfg["origin_zip"],    str(row["origin_zip"])),
-            "dest_zip":      _try_fill(self.page, cfg["dest_zip"],      str(row["dest_zip"])),
-            "weight":        _try_fill(self.page, cfg["weight"],        str(row["weight"])),
-            "freight_class": _try_select_or_fill(self.page, cfg["freight_class"], str(row["freight_class"])),
-        }
-        if row.get("pieces"):
-            _try_fill(self.page, cfg["pieces"], str(row["pieces"]))
 
-        missing = [k for k, v in filled.items() if not v]
-        if missing:
-            print(f"[FFE]  ⚠ Row {row['row_index']}: could not fill — {missing}")
-            print( "       Update selectors in python/ffe-selectors.json → quote_form")
+        # ── Origin / destination ──────────────────────────────────────────────
+        self.page.fill(cfg["origin_zip"], str(row["origin_zip"]).strip())
+        self.page.fill(cfg["dest_zip"],   str(row["dest_zip"]).strip())
+
+        # ── Weight ───────────────────────────────────────────────────────────
+        # The field defaults to 0; clear it first then type the value
+        weight_el = self.page.query_selector(cfg["weight"])
+        if weight_el:
+            weight_el.triple_click()
+            weight_el.type(str(int(float(str(row["weight"])))))
+        else:
+            raise RuntimeError(f"Weight field '{cfg['weight']}' not found on form.")
+
+        # ── Freight class → internal ID ───────────────────────────────────────
+        class_id = _resolve_class_id(str(row["freight_class"]))
+        self.page.select_option(cfg["freight_class"], value=class_id)
 
         _screenshot(self.page, f"05-form-filled-row{row['row_index']}")
 
-        with self.page.expect_navigation(wait_until="networkidle", timeout=30_000):
+        # ── Submit ────────────────────────────────────────────────────────────
+        with self.page.expect_navigation(wait_until="networkidle", timeout=45_000):
             self.page.click(cfg["submit"])
 
         _screenshot(self.page, f"06-results-row{row['row_index']}")
 
+        if "/Account/Login" in self.page.url:
+            raise RuntimeError("Session expired mid-job; re-login required.")
+
+        # ── Parse results ─────────────────────────────────────────────────────
         res = CONFIG["results"]
-        rate         = _get_text(self.page, res["total_charge"])
-        transit_days = _get_text(self.page, res["transit_days"])
         quote_number = _get_text(self.page, res["quote_number"])
+        raw_rate     = _get_text(self.page, res["total_charge"])
+        transit_days = _get_text(self.page, res["transit_days"])
+
+        # Normalise rate — keep the dollar amount only if we got one
+        rate = _parse_dollar(raw_rate)
 
         if not rate:
             print(
-                f"[FFE]  ⚠ Row {row['row_index']}: no rate found. "
-                f"Check selectors → results in ffe-selectors.json. "
-                f"Screenshot: python/screenshots/06-results-row{row['row_index']}-*.png"
+                f"[FFE]  ⚠ Row {row['row_index']}: no rate found on result page "
+                f"({self.page.url}). "
+                "Screenshot saved — check python/screenshots/ and update "
+                "ffe-selectors.json → results → total_charge if the selector changed."
             )
 
         return {"rate": rate, "transit_days": transit_days, "quote_number": quote_number}
@@ -239,21 +226,42 @@ class FFEQuoter:
     # Process all rows for a job
     # ─────────────────────────────────────────────────────────────────────────
 
-    def process_job(self, rows: list[dict], username: str, password: str, on_row_done) -> None:
+    def process_job(
+        self,
+        rows: list[dict],
+        username: str,
+        password: str,
+        on_row_done,
+    ) -> None:
         """
-        on_row_done(row_id, result_dict, error_str) called after each row.
-        result_dict has keys: rate, transit_days, quote_number
+        on_row_done(row_id, result_dict, error_str) — called after every row.
+        result_dict keys: rate, transit_days, quote_number
         """
         self.login(username, password)
-        self.navigate_to_rate_quote()
+        self.navigate_to_rate_request()
 
         for i, row in enumerate(rows):
             try:
                 result = self.get_quote(row)
                 on_row_done(row["id"], result, None)
             except Exception as exc:
-                on_row_done(row["id"], {}, str(exc))
                 _screenshot(self.page, f"error-row{row['row_index']}")
+                on_row_done(row["id"], {}, str(exc))
 
             if i < len(rows) - 1:
                 time.sleep(DELAY_BETWEEN_QUOTES)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _parse_dollar(text: str | None) -> str | None:
+    """Return the dollar amount string or None if nothing parseable."""
+    if not text:
+        return None
+    # Accept strings like "$558.72 USD", "558.72", "$1,234.56"
+    match = re.search(r"\$?([\d,]+\.?\d*)", text)
+    if match:
+        return "$" + match.group(1)
+    return text.strip() or None
