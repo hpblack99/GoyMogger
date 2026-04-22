@@ -1,2 +1,6 @@
 node_modules/
 .env
+dist-server/
+python/screenshots/
+python/__pycache__/
+python/.env
