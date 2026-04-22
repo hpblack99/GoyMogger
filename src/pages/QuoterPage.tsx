@@ -1,45 +1,131 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import * as XLSX from 'xlsx'
+import { supabase } from '../lib/supabase'
 import styles from './QuoterPage.module.css'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface ShipmentRow {
-  rowIndex: number
-  originZip: string
-  destZip: string
+  origin_zip: string
+  dest_zip: string
   weight: number
-  freightClass: string
+  freight_class: string
   pieces?: number
   commodity?: string
 }
 
-interface QuoteResult extends ShipmentRow {
+interface QuoteRow {
+  id: string
+  job_id: string
+  row_index: number
+  origin_zip: string
+  dest_zip: string
+  weight: number
+  freight_class: string
+  pieces?: number
+  commodity?: string
   status: 'pending' | 'processing' | 'complete' | 'error'
   rate?: string
-  transitDays?: string
-  quoteNumber?: string
+  transit_days?: string
+  quote_number?: string
   error?: string
 }
 
-interface Job {
+interface QuoteJob {
   id: string
-  status: 'queued' | 'running' | 'complete' | 'error'
-  progress: number
-  total: number
-  results: QuoteResult[]
+  status: 'pending' | 'running' | 'complete' | 'error'
+  total_rows: number
+  done_rows: number
   error?: string
-  createdAt: string
-  completedAt?: string
+  created_at: string
 }
 
-type Step = 'upload' | 'credentials' | 'preview' | 'running' | 'done'
+type Step = 'upload' | 'preview' | 'waiting' | 'running' | 'done'
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
-function StatusBadge({ status }: { status: QuoteResult['status'] }) {
-  const map: Record<QuoteResult['status'], { label: string; cls: string }> = {
-    pending: { label: 'Pending', cls: styles.statusPending },
-    processing: { label: 'Processing…', cls: styles.statusProcessing },
-    complete: { label: 'Complete', cls: styles.statusComplete },
-    error: { label: 'Error', cls: styles.statusError },
+// ── Column detection patterns ──────────────────────────────────────────────────
+const COL_PATTERNS: Record<keyof ShipmentRow, RegExp> = {
+  origin_zip:    /origin|orig|shipper.?zip/i,
+  dest_zip:      /dest|destination|consignee.?zip/i,
+  weight:        /weight|wt\b/i,
+  freight_class: /class|nmfc/i,
+  pieces:        /piece|pallet|qty/i,
+  commodity:     /commodity|description|desc\b/i,
+}
+
+function parseXlsx(file: File): Promise<ShipmentRow[]> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const wb = XLSX.read(e.target!.result, { type: 'binary' })
+        const ws = wb.Sheets[wb.SheetNames[0]]
+        const raw = XLSX.utils.sheet_to_json<(string | number)[]>(ws, { header: 1 })
+        if (raw.length < 2) { reject(new Error('File needs a header row and at least one data row.')); return }
+
+        const headers = (raw[0] as string[]).map((h) => String(h ?? '').trim())
+        const colIdx: Partial<Record<keyof ShipmentRow, number>> = {}
+        for (const [key, pat] of Object.entries(COL_PATTERNS)) {
+          const idx = headers.findIndex((h) => pat.test(h))
+          if (idx >= 0) colIdx[key as keyof ShipmentRow] = idx
+        }
+
+        const required = ['origin_zip', 'dest_zip', 'weight', 'freight_class'] as const
+        const missing = required.filter((k) => colIdx[k] === undefined)
+        if (missing.length) {
+          reject(new Error(`Missing columns: ${missing.join(', ')}.\nHeaders found: ${headers.join(', ')}`))
+          return
+        }
+
+        const rows: ShipmentRow[] = raw
+          .slice(1)
+          .filter((r) => Array.isArray(r) && r.length && r[colIdx.origin_zip!])
+          .map((r) => ({
+            origin_zip:    String(r[colIdx.origin_zip!] ?? '').trim(),
+            dest_zip:      String(r[colIdx.dest_zip!] ?? '').trim(),
+            weight:        Number(r[colIdx.weight!] ?? 0),
+            freight_class: String(r[colIdx.freight_class!] ?? '').trim(),
+            pieces:        colIdx.pieces !== undefined ? Number(r[colIdx.pieces]) || undefined : undefined,
+            commodity:     colIdx.commodity !== undefined ? String(r[colIdx.commodity] ?? '').trim() || undefined : undefined,
+          }))
+
+        resolve(rows)
+      } catch (err) {
+        reject(err)
+      }
+    }
+    reader.onerror = () => reject(new Error('File read error'))
+    reader.readAsBinaryString(file)
+  })
+}
+
+function downloadResults(rows: QuoteRow[]) {
+  const data = rows.map((r) => ({
+    '#':            r.row_index,
+    'Origin ZIP':   r.origin_zip,
+    'Dest ZIP':     r.dest_zip,
+    'Weight (lbs)': r.weight,
+    'Class':        r.freight_class,
+    'Pieces':       r.pieces ?? '',
+    'Commodity':    r.commodity ?? '',
+    'Rate':         r.rate ?? '',
+    'Transit Days': r.transit_days ?? '',
+    'Quote #':      r.quote_number ?? '',
+    'Status':       r.status,
+    'Notes':        r.error ?? '',
+  }))
+  const ws = XLSX.utils.json_to_sheet(data)
+  ws['!cols'] = [4,12,12,14,8,8,20,12,14,14,10,30].map((w) => ({ wch: w }))
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'FFE Quotes')
+  XLSX.writeFile(wb, `ffe-quotes-${new Date().toISOString().split('T')[0]}.xlsx`)
+}
+
+// ── Status badge ───────────────────────────────────────────────────────────────
+function StatusBadge({ status }: { status: QuoteRow['status'] }) {
+  const map = {
+    pending:    { label: 'Pending',       cls: styles.statusPending },
+    processing: { label: 'Processing…',   cls: styles.statusProcessing },
+    complete:   { label: 'Complete',      cls: styles.statusComplete },
+    error:      { label: 'Error',         cls: styles.statusError },
   }
   const { label, cls } = map[status]
   return <span className={`${styles.badge} ${cls}`}>{label}</span>
@@ -47,112 +133,150 @@ function StatusBadge({ status }: { status: QuoteResult['status'] }) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function QuoterPage() {
-  const [step, setStep] = useState<Step>('upload')
-  const [rows, setRows] = useState<ShipmentRow[]>([])
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [debugMode, setDebugMode] = useState(false)
-  const [job, setJob] = useState<Job | null>(null)
+  const [step, setStep]           = useState<Step>('upload')
+  const [parsedRows, setParsedRows] = useState<ShipmentRow[]>([])
+  const [job, setJob]             = useState<QuoteJob | null>(null)
+  const [quoteRows, setQuoteRows] = useState<QuoteRow[]>([])
   const [uploadError, setUploadError] = useState<string | null>(null)
-  const [runError, setRunError] = useState<string | null>(null)
-  const [isDragging, setIsDragging] = useState(false)
-  const [uploading, setUploading] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [isDragging, setIsDragging]   = useState(false)
+  const [uploading, setUploading]     = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
-  // ── Upload ──────────────────────────────────────────────────────────────────
+  // ── Handle file drop/select ──────────────────────────────────────────────────
   const handleFile = useCallback(async (file: File) => {
     setUploadError(null)
     setUploading(true)
-    const fd = new FormData()
-    fd.append('file', file)
     try {
-      const res = await fetch('/api/upload', { method: 'POST', body: fd })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Upload failed')
-      setRows(data.rows)
-      setStep('credentials')
+      const rows = await parseXlsx(file)
+      if (!rows.length) throw new Error('No valid data rows found.')
+      setParsedRows(rows)
+      setStep('preview')
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Upload failed')
+      setUploadError(err instanceof Error ? err.message : 'Failed to parse file')
     } finally {
       setUploading(false)
     }
   }, [])
 
   const onFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) handleFile(file)
+    const f = e.target.files?.[0]
+    if (f) handleFile(f)
     e.target.value = ''
   }
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
-    const file = e.dataTransfer.files[0]
-    if (file) handleFile(file)
+    const f = e.dataTransfer.files[0]
+    if (f) handleFile(f)
   }
 
-  // ── Run job ──────────────────────────────────────────────────────────────────
-  const startJob = async () => {
-    setRunError(null)
+  // ── Submit job to Supabase ───────────────────────────────────────────────────
+  const submitJob = async () => {
+    setSubmitError(null)
     try {
-      const res = await fetch('/api/run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rows, username, password, debugMode }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to start job')
-      setJob({ id: data.jobId, status: 'queued', progress: 0, total: rows.length, results: rows.map(r => ({ ...r, status: 'pending' })), createdAt: new Date().toISOString() })
-      setStep('running')
+      // Insert job record
+      const { data: jobData, error: jobErr } = await supabase
+        .from('quote_jobs')
+        .insert({ total_rows: parsedRows.length, status: 'pending' })
+        .select()
+        .single()
+
+      if (jobErr) throw jobErr
+
+      // Insert all rows
+      const rowInserts = parsedRows.map((r, i) => ({
+        job_id:        jobData.id,
+        row_index:     i + 1,
+        origin_zip:    r.origin_zip,
+        dest_zip:      r.dest_zip,
+        weight:        r.weight,
+        freight_class: r.freight_class,
+        pieces:        r.pieces ?? undefined,
+        commodity:     r.commodity ?? undefined,
+        status:        'pending',
+      }))
+
+      const { error: rowsErr } = await supabase.from('quote_rows').insert(rowInserts)
+      if (rowsErr) throw rowsErr
+
+      setJob(jobData as QuoteJob)
+      setQuoteRows(rowInserts.map((r, i) => ({ ...r, id: '', status: 'pending' as const, row_index: i + 1 })))
+      setStep('waiting')
     } catch (err) {
-      setRunError(err instanceof Error ? err.message : 'Failed to start')
+      setSubmitError(err instanceof Error ? err.message : 'Failed to submit job')
     }
   }
 
-  // ── Poll job status ──────────────────────────────────────────────────────────
+  // ── Subscribe to real-time updates once we have a job ───────────────────────
   useEffect(() => {
-    if (step !== 'running' || !job?.id) return
-    pollRef.current = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/job/${job.id}`)
-        if (!res.ok) return
-        const data: Job = await res.json()
-        setJob(data)
-        if (data.status === 'complete' || data.status === 'error') {
-          clearInterval(pollRef.current!)
-          setStep('done')
-        }
-      } catch { /* network glitch, keep polling */ }
-    }, 2000)
-    return () => clearInterval(pollRef.current!)
-  }, [step, job?.id])
+    if (!job?.id || step === 'upload' || step === 'preview') return
 
-  // ── Download ─────────────────────────────────────────────────────────────────
-  const download = () => {
-    if (job?.id) window.location.href = `/api/download/${job.id}`
-  }
+    // Load initial rows
+    supabase
+      .from('quote_rows')
+      .select('*')
+      .eq('job_id', job.id)
+      .order('row_index')
+      .then(({ data }) => { if (data) setQuoteRows(data as QuoteRow[]) })
+
+    // Real-time channel
+    const channel = supabase
+      .channel(`job-${job.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'quote_jobs', filter: `id=eq.${job.id}` },
+        (payload) => {
+          const updated = payload.new as QuoteJob
+          setJob(updated)
+          if (updated.status === 'complete' || updated.status === 'error') {
+            setStep('done')
+          } else if (updated.status === 'running' && step === 'waiting') {
+            setStep('running')
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'quote_rows', filter: `job_id=eq.${job.id}` },
+        (payload) => {
+          const updated = payload.new as QuoteRow
+          setQuoteRows((prev) =>
+            prev.map((r) => (r.id === updated.id || r.row_index === updated.row_index ? updated : r))
+          )
+          if (step === 'waiting') setStep('running')
+        }
+      )
+      .subscribe()
+
+    channelRef.current = channel
+    return () => { supabase.removeChannel(channel) }
+  }, [job?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Reset ────────────────────────────────────────────────────────────────────
   const reset = () => {
+    if (channelRef.current) supabase.removeChannel(channelRef.current)
     setStep('upload')
-    setRows([])
+    setParsedRows([])
     setJob(null)
-    setRunError(null)
+    setQuoteRows([])
     setUploadError(null)
+    setSubmitError(null)
   }
 
-  // ── Render helpers ───────────────────────────────────────────────────────────
-  const completedCount = job?.results.filter((r) => r.status === 'complete').length ?? 0
-  const errorCount = job?.results.filter((r) => r.status === 'error').length ?? 0
-  const pct = job ? Math.round((job.progress / job.total) * 100) : 0
+  // ── Derived stats ─────────────────────────────────────────────────────────────
+  const pct        = job ? Math.round(((job.done_rows) / job.total_rows) * 100) : 0
+  const completed  = quoteRows.filter((r) => r.status === 'complete').length
+  const errors     = quoteRows.filter((r) => r.status === 'error').length
 
   return (
     <div className={styles.page}>
       <div className={styles.header}>
         <h1 className={styles.title}>FFE Reefer LTL Quote Bot</h1>
         <p className={styles.subtitle}>
-          Upload a spreadsheet of shipments and automatically retrieve quotes from Frozen Food Express.
+          Upload a spreadsheet → job lands in Supabase → Python worker quotes each row → results appear live.
         </p>
         <StepIndicator current={step} />
       </div>
@@ -162,11 +286,9 @@ export default function QuoterPage() {
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>Step 1 — Upload Shipment Spreadsheet</h2>
           <p className={styles.hint}>
-            Accepted formats: <strong>.csv</strong>, <strong>.xlsx</strong>, <strong>.xls</strong>
-            <br />
-            Required columns: <code>Origin ZIP</code>, <code>Dest ZIP</code>, <code>Weight</code>, <code>Class</code>
-            <br />
-            Optional: <code>Pieces</code>, <code>Commodity</code>
+            Formats: <strong>.csv</strong>, <strong>.xlsx</strong>, <strong>.xls</strong><br />
+            Required columns: <code>Origin ZIP</code> · <code>Dest ZIP</code> · <code>Weight</code> · <code>Class</code><br />
+            Optional: <code>Pieces</code> · <code>Commodity</code>
           </p>
           <div
             className={`${styles.dropzone} ${isDragging ? styles.dragging : ''}`}
@@ -175,124 +297,51 @@ export default function QuoterPage() {
             onDragLeave={() => setIsDragging(false)}
             onDrop={onDrop}
           >
-            {uploading ? (
-              <span className={styles.spinner} />
-            ) : (
-              <>
-                <span className={styles.dropIcon}>📂</span>
-                <span className={styles.dropText}>
-                  {isDragging ? 'Drop it!' : 'Drag & drop your spreadsheet here, or click to browse'}
-                </span>
-              </>
-            )}
+            {uploading
+              ? <span className={styles.spinner} />
+              : <>
+                  <span className={styles.dropIcon}>📂</span>
+                  <span className={styles.dropText}>
+                    {isDragging ? 'Drop it!' : 'Drag & drop your spreadsheet here, or click to browse'}
+                  </span>
+                </>}
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,.xlsx,.xls"
-            style={{ display: 'none' }}
-            onChange={onFileInput}
-          />
+          <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" style={{ display: 'none' }} onChange={onFileInput} />
           {uploadError && <p className={styles.errorMsg}>{uploadError}</p>}
         </div>
       )}
 
-      {/* ── STEP 2: Credentials ── */}
-      {step === 'credentials' && (
+      {/* ── STEP 2: Preview ── */}
+      {step === 'preview' && (
         <div className={styles.card}>
-          <h2 className={styles.cardTitle}>Step 2 — FFE Login Credentials</h2>
+          <h2 className={styles.cardTitle}>Step 2 — Review &amp; Submit</h2>
           <p className={styles.hint}>
-            Your credentials are used only for this session and are never stored.
+            {parsedRows.length} shipment{parsedRows.length !== 1 ? 's' : ''} parsed.
+            Submitting creates the job in Supabase — make sure your Python worker is running.
           </p>
-          <div className={styles.form}>
-            <label className={styles.label}>
-              FFE Username
-              <input
-                className={styles.input}
-                type="text"
-                autoComplete="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="your@email.com or username"
-              />
-            </label>
-            <label className={styles.label}>
-              FFE Password
-              <input
-                className={styles.input}
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-              />
-            </label>
-            <label className={styles.checkboxLabel}>
-              <input
-                type="checkbox"
-                checked={debugMode}
-                onChange={(e) => setDebugMode(e.target.checked)}
-              />
-              Debug mode (opens a visible browser window — useful for verifying form selectors)
-            </label>
-          </div>
+          <ShipmentPreviewTable rows={parsedRows} />
+          {submitError && <p className={styles.errorMsg}>{submitError}</p>}
           <div className={styles.actions}>
-            <button className={styles.btnSecondary} onClick={() => setStep('upload')}>Back</button>
-            <button
-              className={styles.btnPrimary}
-              disabled={!username || !password}
-              onClick={() => setStep('preview')}
-            >
-              Next — Preview Shipments
+            <button className={styles.btnSecondary} onClick={reset}>Back</button>
+            <button className={styles.btnPrimary} onClick={submitJob}>
+              Submit {parsedRows.length} Shipment{parsedRows.length !== 1 ? 's' : ''} to Queue
             </button>
           </div>
         </div>
       )}
 
-      {/* ── STEP 3: Preview ── */}
-      {step === 'preview' && (
+      {/* ── STEP 3: Waiting for worker ── */}
+      {step === 'waiting' && (
         <div className={styles.card}>
-          <h2 className={styles.cardTitle}>Step 3 — Review &amp; Start</h2>
+          <h2 className={styles.cardTitle}>Waiting for Worker…</h2>
           <p className={styles.hint}>
-            {rows.length} shipment{rows.length !== 1 ? 's' : ''} ready to quote.
+            Job <code className={styles.jobId}>{job?.id}</code> is in the queue.<br />
+            Start your Python worker if it's not already running:
           </p>
-          <div className={styles.tableWrapper}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Origin ZIP</th>
-                  <th>Dest ZIP</th>
-                  <th>Weight</th>
-                  <th>Class</th>
-                  <th>Pieces</th>
-                  <th>Commodity</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.slice(0, 50).map((r) => (
-                  <tr key={r.rowIndex}>
-                    <td>{r.rowIndex}</td>
-                    <td>{r.originZip}</td>
-                    <td>{r.destZip}</td>
-                    <td>{r.weight}</td>
-                    <td>{r.freightClass}</td>
-                    <td>{r.pieces ?? '—'}</td>
-                    <td>{r.commodity ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {rows.length > 50 && (
-              <p className={styles.truncNote}>Showing first 50 of {rows.length} rows.</p>
-            )}
-          </div>
-          {runError && <p className={styles.errorMsg}>{runError}</p>}
-          <div className={styles.actions}>
-            <button className={styles.btnSecondary} onClick={() => setStep('credentials')}>Back</button>
-            <button className={styles.btnPrimary} onClick={startJob}>
-              Start Quoting {rows.length} Shipment{rows.length !== 1 ? 's' : ''}
-            </button>
+          <pre className={styles.codeBlock}>cd python && python worker.py</pre>
+          <p className={styles.hint}>The page will update automatically once the worker picks it up.</p>
+          <div className={styles.waitSpinnerRow}>
+            <span className={styles.spinner} />
           </div>
         </div>
       )}
@@ -301,56 +350,35 @@ export default function QuoterPage() {
       {step === 'running' && job && (
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>Quoting in Progress…</h2>
-          <div className={styles.progressSection}>
-            <div className={styles.progressBar}>
-              <div className={styles.progressFill} style={{ width: `${pct}%` }} />
-            </div>
-            <p className={styles.progressLabel}>
-              {job.progress} / {job.total} ({pct}%)
-            </p>
-          </div>
-          <ResultsTable results={job.results} />
+          <ProgressBar pct={pct} done={job.done_rows} total={job.total_rows} />
+          <ResultsTable rows={quoteRows} />
         </div>
       )}
 
       {/* ── STEP 5: Done ── */}
       {step === 'done' && job && (
         <div className={styles.card}>
-          {job.status === 'error' ? (
-            <>
-              <h2 className={`${styles.cardTitle} ${styles.errorTitle}`}>Job Failed</h2>
-              <p className={styles.errorMsg}>{job.error}</p>
-              <p className={styles.hint}>
-                Check <code>server/screenshots/</code> for screenshots taken during automation.
-                <br />
-                Most issues are fixed by updating selectors in <code>server/ffe-selectors.json</code>.
-              </p>
-            </>
-          ) : (
-            <>
-              <h2 className={styles.cardTitle}>Done!</h2>
-              <div className={styles.summaryRow}>
-                <div className={styles.summaryChip}>
-                  <span className={styles.summaryNum}>{completedCount}</span> Quoted
+          {job.status === 'error'
+            ? <>
+                <h2 className={`${styles.cardTitle} ${styles.errorTitle}`}>Worker Error</h2>
+                <p className={styles.errorMsg}>{job.error}</p>
+                <p className={styles.hint}>Check <code>python/screenshots/</code> for debug screenshots.<br />Most fixes are in <code>python/ffe-selectors.json</code>.</p>
+              </>
+            : <>
+                <h2 className={styles.cardTitle}>Done!</h2>
+                <div className={styles.summaryRow}>
+                  <div className={styles.summaryChip}><span className={styles.summaryNum}>{completed}</span> Quoted</div>
+                  {errors > 0 && <div className={`${styles.summaryChip} ${styles.summaryChipError}`}><span className={styles.summaryNum}>{errors}</span> Errors</div>}
                 </div>
-                {errorCount > 0 && (
-                  <div className={`${styles.summaryChip} ${styles.summaryChipError}`}>
-                    <span className={styles.summaryNum}>{errorCount}</span> Errors
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-          <ResultsTable results={job.results} />
+              </>}
+          <ResultsTable rows={quoteRows} />
           <div className={styles.actions}>
-            {job.status === 'complete' && (
-              <button className={styles.btnPrimary} onClick={download}>
+            {quoteRows.length > 0 && (
+              <button className={styles.btnPrimary} onClick={() => downloadResults(quoteRows)}>
                 Download Results (.xlsx)
               </button>
             )}
-            <button className={styles.btnSecondary} onClick={reset}>
-              Start Over
-            </button>
+            <button className={styles.btnSecondary} onClick={reset}>Start Over</button>
           </div>
         </div>
       )}
@@ -359,23 +387,21 @@ export default function QuoterPage() {
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
+
 function StepIndicator({ current }: { current: Step }) {
   const steps: { key: Step; label: string }[] = [
-    { key: 'upload', label: 'Upload' },
-    { key: 'credentials', label: 'Login' },
+    { key: 'upload',  label: 'Upload'  },
     { key: 'preview', label: 'Preview' },
+    { key: 'waiting', label: 'Queued'  },
     { key: 'running', label: 'Running' },
-    { key: 'done', label: 'Done' },
+    { key: 'done',    label: 'Done'    },
   ]
-  const currentIdx = steps.findIndex((s) => s.key === current)
+  const idx = steps.findIndex((s) => s.key === current)
   return (
     <div className={styles.steps}>
       {steps.map((s, i) => (
-        <div
-          key={s.key}
-          className={`${styles.step} ${i < currentIdx ? styles.stepDone : ''} ${i === currentIdx ? styles.stepActive : ''}`}
-        >
-          <div className={styles.stepDot}>{i < currentIdx ? '✓' : i + 1}</div>
+        <div key={s.key} className={`${styles.step} ${i < idx ? styles.stepDone : ''} ${i === idx ? styles.stepActive : ''}`}>
+          <div className={styles.stepDot}>{i < idx ? '✓' : i + 1}</div>
           <span className={styles.stepLabel}>{s.label}</span>
         </div>
       ))}
@@ -383,36 +409,62 @@ function StepIndicator({ current }: { current: Step }) {
   )
 }
 
-function ResultsTable({ results }: { results: QuoteResult[] }) {
+function ProgressBar({ pct, done, total }: { pct: number; done: number; total: number }) {
+  return (
+    <div className={styles.progressSection}>
+      <div className={styles.progressBar}>
+        <div className={styles.progressFill} style={{ width: `${pct}%` }} />
+      </div>
+      <p className={styles.progressLabel}>{done} / {total} ({pct}%)</p>
+    </div>
+  )
+}
+
+function ShipmentPreviewTable({ rows }: { rows: ShipmentRow[] }) {
   return (
     <div className={styles.tableWrapper}>
       <table className={styles.table}>
         <thead>
-          <tr>
-            <th>#</th>
-            <th>Origin</th>
-            <th>Dest</th>
-            <th>Weight</th>
-            <th>Class</th>
-            <th>Status</th>
-            <th>Rate</th>
-            <th>Transit</th>
-            <th>Quote #</th>
-            <th>Notes</th>
-          </tr>
+          <tr><th>#</th><th>Origin ZIP</th><th>Dest ZIP</th><th>Weight</th><th>Class</th><th>Pieces</th><th>Commodity</th></tr>
         </thead>
         <tbody>
-          {results.map((r) => (
-            <tr key={r.rowIndex} className={r.status === 'error' ? styles.rowError : r.status === 'complete' ? styles.rowComplete : ''}>
-              <td>{r.rowIndex}</td>
-              <td>{r.originZip}</td>
-              <td>{r.destZip}</td>
+          {rows.slice(0, 50).map((r, i) => (
+            <tr key={i}>
+              <td>{i + 1}</td>
+              <td>{r.origin_zip}</td>
+              <td>{r.dest_zip}</td>
               <td>{r.weight}</td>
-              <td>{r.freightClass}</td>
+              <td>{r.freight_class}</td>
+              <td>{r.pieces ?? '—'}</td>
+              <td>{r.commodity ?? '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {rows.length > 50 && <p className={styles.truncNote}>Showing first 50 of {rows.length} rows.</p>}
+    </div>
+  )
+}
+
+function ResultsTable({ rows }: { rows: QuoteRow[] }) {
+  return (
+    <div className={styles.tableWrapper}>
+      <table className={styles.table}>
+        <thead>
+          <tr><th>#</th><th>Origin</th><th>Dest</th><th>Weight</th><th>Class</th><th>Status</th><th>Rate</th><th>Transit</th><th>Quote #</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.id || r.row_index} className={r.status === 'error' ? styles.rowError : r.status === 'complete' ? styles.rowComplete : ''}>
+              <td>{r.row_index}</td>
+              <td>{r.origin_zip}</td>
+              <td>{r.dest_zip}</td>
+              <td>{r.weight}</td>
+              <td>{r.freight_class}</td>
               <td><StatusBadge status={r.status} /></td>
               <td className={styles.rateCell}>{r.rate ?? '—'}</td>
-              <td>{r.transitDays ?? '—'}</td>
-              <td>{r.quoteNumber ?? '—'}</td>
+              <td>{r.transit_days ?? '—'}</td>
+              <td>{r.quote_number ?? '—'}</td>
               <td className={styles.notesCell}>{r.error ?? ''}</td>
             </tr>
           ))}
