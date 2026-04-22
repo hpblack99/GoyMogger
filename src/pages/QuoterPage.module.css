@@ -113,6 +113,77 @@
   font-size: 0.85em;
 }
 
+/* ── Batch settings ── */
+.batchSettings {
+  margin-bottom: 20px;
+}
+
+.batchLabel {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-neutral-400);
+  margin-bottom: 10px;
+}
+
+.settingsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 600px) {
+  .settingsGrid { grid-template-columns: 1fr; }
+}
+
+.select {
+  padding: 10px 14px;
+  border: 1px solid var(--color-neutral-300);
+  border-radius: 8px;
+  font-size: 0.92rem;
+  color: var(--color-neutral-900);
+  background: #fff;
+  transition: border-color 0.15s;
+  outline: none;
+  width: 100%;
+  cursor: pointer;
+}
+
+.select:focus {
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px var(--color-primary-100);
+}
+
+.labelMeta {
+  font-weight: 400;
+  color: var(--color-neutral-400);
+  font-size: 0.8em;
+}
+
+.divider {
+  height: 1px;
+  background: var(--color-neutral-100);
+  margin: 20px 0;
+}
+
+.batchBadge {
+  display: inline-block;
+  background: var(--color-primary-50);
+  color: var(--color-primary-700);
+  border: 1px solid var(--color-primary-200);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.88rem;
+  margin-bottom: 16px;
+}
+
+.noClass {
+  color: var(--color-error-500);
+  font-style: italic;
+  font-size: 0.85em;
+}
+
 /* ── Dropzone ── */
 .dropzone {
   border: 2px dashed var(--color-neutral-300);

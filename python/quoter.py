@@ -188,9 +188,8 @@ class FFEQuoter:
         else:
             raise RuntimeError(f"Weight field '{cfg['weight']}' not found on form.")
 
-        # ── Freight class → internal ID ───────────────────────────────────────
-        class_id = _resolve_class_id(str(row["freight_class"]))
-        self.page.select_option(cfg["freight_class"], value=class_id)
+        # ── Freight class / commodity → FFE select option ────────────────────
+        _select_class_option(self.page, cfg["freight_class"], str(row["freight_class"]))
 
         _screenshot(self.page, f"05-form-filled-row{row['row_index']}")
 
@@ -255,6 +254,32 @@ class FFEQuoter:
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _select_class_option(page: Page, selector: str, value: str) -> None:
+    """
+    Select the FFE class/commodity dropdown option.
+    Handles commodity descriptions ("Meats & Meat Products"), class labels
+    ("Class 100"), bare numbers ("100"), and internal IDs as fallback.
+    """
+    # 1. Direct label match — works for commodity descriptions and "Class 100"
+    try:
+        page.select_option(selector, label=value, timeout=3_000)
+        return
+    except Exception:
+        pass
+
+    # 2. Bare number → "Class <n>" label (e.g. "100" → "Class 100")
+    cleaned = re.sub(r"(?i)^class\s*", "", value.strip())
+    try:
+        page.select_option(selector, label=f"Class {cleaned}", timeout=3_000)
+        return
+    except Exception:
+        pass
+
+    # 3. Internal ID map fallback
+    class_id = _resolve_class_id(value)
+    page.select_option(selector, value=class_id)
+
 
 def _parse_dollar(text: str | None) -> str | None:
     """Return the dollar amount string or None if nothing parseable."""
