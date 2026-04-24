@@ -116,14 +116,14 @@ class FFEQuoter:
 
     def login(self, username: str, password: str) -> None:
         print("[FFE] Navigating to login page…")
-        self.page.goto(CONFIG["urls"]["login"], wait_until="networkidle", timeout=30_000)
+        self.page.goto(CONFIG["urls"]["login"], wait_until="load", timeout=30_000)
         _screenshot(self.page, "01-login-page")
 
         self.page.fill(CONFIG["login"]["username"], username)
         self.page.fill(CONFIG["login"]["password"], password)
         _screenshot(self.page, "02-credentials-filled")
 
-        with self.page.expect_navigation(wait_until="networkidle", timeout=30_000):
+        with self.page.expect_navigation(wait_until="load", timeout=30_000):
             self.page.click(CONFIG["login"]["submit"])
 
         _screenshot(self.page, "03-after-login")
@@ -144,7 +144,7 @@ class FFEQuoter:
 
     def navigate_to_rate_request(self) -> None:
         print("[FFE] Navigating to Rate Request…")
-        self.page.goto(CONFIG["urls"]["rate_request"], wait_until="networkidle", timeout=30_000)
+        self.page.goto(CONFIG["urls"]["rate_request"], wait_until="load", timeout=30_000)
         _screenshot(self.page, "04-rate-request")
 
         if "/Account/Login" in self.page.url:
@@ -171,7 +171,7 @@ class FFEQuoter:
         Returns: {rate, transit_days, quote_number}  — any field may be None on parse failure
         """
         # Fresh form for every quote
-        self.page.goto(CONFIG["urls"]["rate_request"], wait_until="networkidle", timeout=30_000)
+        self.page.goto(CONFIG["urls"]["rate_request"], wait_until="load", timeout=30_000)
 
         cfg = CONFIG["quote_form"]
 
@@ -192,11 +192,20 @@ class FFEQuoter:
         _screenshot(self.page, f"05-form-filled-row{row['row_index']}")
 
         # ── Submit ────────────────────────────────────────────────────────────
-        # First click activates FFE's JS validation; second click submits.
-        self.page.click(cfg["submit"])
-        self.page.wait_for_timeout(600)
-        with self.page.expect_navigation(wait_until="networkidle", timeout=45_000):
+        # First click triggers FFE's client-side validation JS.
+        # no_wait_after=True prevents Playwright from hanging waiting for a
+        # navigation that may or may not start after this first click.
+        self.page.click(cfg["submit"], no_wait_after=True)
+        self.page.wait_for_timeout(800)
+
+        # Second click submits. Use "load" not "networkidle" — FFE's result
+        # page fires analytics/tracking requests that prevent networkidle
+        # from ever being reached within a reasonable timeout.
+        with self.page.expect_navigation(wait_until="load", timeout=60_000):
             self.page.click(cfg["submit"])
+
+        # Wait until we're actually on the result page before scraping
+        self.page.wait_for_url("**/RateResult**", timeout=30_000)
 
         _screenshot(self.page, f"06-results-row{row['row_index']}")
 
