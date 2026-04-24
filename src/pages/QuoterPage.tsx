@@ -3,12 +3,7 @@ import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
 import styles from './QuoterPage.module.css'
 
-// ── FFE dropdown options (exact labels from ffeinc.com /Customer/RateRequest) ──
-const CLASS_OPTIONS = [
-  '55', '60', '65', '70', '77.5', '85', '92.5', '100',
-  '110', '125', '150', '175', '200', '250', '300', '400', '500',
-]
-
+// ── FFE #Item1_ClassId options — exact labels from live DOM ───────────────────
 const COMMODITY_OPTIONS = [
   'Animal Food - Not for Human Consumption',
   'Bakery Goods Less Than 12 Pounds Per Cubic Foot',
@@ -32,52 +27,49 @@ const COMMODITY_OPTIONS = [
   'Wax Products or Candles',
 ]
 
+const CLASS_OPTIONS = [
+  '55', '60', '65', '70', '77.5', '85', '92.5', '100',
+  '110', '125', '150', '175', '200', '250', '300', '400', '500',
+]
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface ShipmentRow {
   origin_zip: string
-  dest_zip: string
-  weight: number
-  freight_class?: string
-  pieces?: number
-  commodity?: string
+  dest_zip:   string
+  weight:     number
 }
 
 interface QuoteRow {
-  id: string
-  job_id: string
-  row_index: number
-  origin_zip: string
-  dest_zip: string
-  weight: number
+  id:           string
+  job_id:       string
+  row_index:    number
+  origin_zip:   string
+  dest_zip:     string
+  weight:       number
   freight_class: string
-  pieces?: number
-  commodity?: string
-  status: 'pending' | 'processing' | 'complete' | 'error'
-  rate?: string
+  status:       'pending' | 'processing' | 'complete' | 'error'
+  rate?:        string
   transit_days?: string
   quote_number?: string
-  error?: string
+  error?:       string
 }
 
 interface QuoteJob {
-  id: string
-  status: 'pending' | 'running' | 'complete' | 'error'
+  id:         string
+  status:     'pending' | 'running' | 'complete' | 'error'
   total_rows: number
-  done_rows: number
-  error?: string
+  done_rows:  number
+  error?:     string
   created_at: string
 }
 
 type Step = 'upload' | 'preview' | 'waiting' | 'running' | 'done'
 
-// ── Column detection patterns ──────────────────────────────────────────────────
+// ── Column detection — supports all common header variants ─────────────────────
 const COL_PATTERNS: Record<string, RegExp> = {
-  origin_zip:    /origin|orig|shipper.?zip/i,
-  dest_zip:      /dest|destination|consignee.?zip/i,
-  weight:        /weight|wt\b/i,
-  freight_class: /class|nmfc/i,
-  pieces:        /piece|pallet|qty/i,
-  commodity:     /commodity|description|desc\b/i,
+  origin_zip: /origin|from.?zip|shipper.?zip/i,
+  dest_zip:   /dest(?:ination)?|to.?zip|consignee/i,
+  weight:     /(?:gross\s+|total\s+)?weight|^wt$/i,
 }
 
 function parseXlsx(file: File): Promise<ShipmentRow[]> {
@@ -85,8 +77,8 @@ function parseXlsx(file: File): Promise<ShipmentRow[]> {
     const reader = new FileReader()
     reader.onload = (e) => {
       try {
-        const wb = XLSX.read(e.target!.result, { type: 'binary' })
-        const ws = wb.Sheets[wb.SheetNames[0]]
+        const wb  = XLSX.read(e.target!.result, { type: 'binary' })
+        const ws  = wb.Sheets[wb.SheetNames[0]]
         const raw = XLSX.utils.sheet_to_json<(string | number)[]>(ws, { header: 1 })
         if (raw.length < 2) { reject(new Error('File needs a header row and at least one data row.')); return }
 
@@ -97,11 +89,12 @@ function parseXlsx(file: File): Promise<ShipmentRow[]> {
           if (idx >= 0) colIdx[key] = idx
         }
 
-        // origin, dest, weight are always required
-        const required = ['origin_zip', 'dest_zip', 'weight'] as const
-        const missing = required.filter((k) => colIdx[k] === undefined)
+        const missing = (['origin_zip', 'dest_zip', 'weight'] as const).filter((k) => colIdx[k] === undefined)
         if (missing.length) {
-          reject(new Error(`Missing columns: ${missing.join(', ')}.\nHeaders found: ${headers.join(', ')}`))
+          reject(new Error(
+            `Missing required columns: ${missing.join(', ')}.\n` +
+            `Headers found: ${headers.join(', ')}`
+          ))
           return
         }
 
@@ -109,12 +102,9 @@ function parseXlsx(file: File): Promise<ShipmentRow[]> {
           .slice(1)
           .filter((r) => Array.isArray(r) && r.length && r[colIdx.origin_zip!])
           .map((r) => ({
-            origin_zip:    String(r[colIdx.origin_zip!] ?? '').trim(),
-            dest_zip:      String(r[colIdx.dest_zip!] ?? '').trim(),
-            weight:        Number(r[colIdx.weight!] ?? 0),
-            freight_class: colIdx.freight_class !== undefined ? String(r[colIdx.freight_class] ?? '').trim() || undefined : undefined,
-            pieces:        colIdx.pieces !== undefined ? Number(r[colIdx.pieces]) || undefined : undefined,
-            commodity:     colIdx.commodity !== undefined ? String(r[colIdx.commodity] ?? '').trim() || undefined : undefined,
+            origin_zip: String(r[colIdx.origin_zip!] ?? '').trim(),
+            dest_zip:   String(r[colIdx.dest_zip!]   ?? '').trim(),
+            weight:     Number(r[colIdx.weight!]      ?? 0),
           }))
 
         resolve(rows)
@@ -134,8 +124,6 @@ function downloadResults(rows: QuoteRow[]) {
     'Dest ZIP':     r.dest_zip,
     'Weight (lbs)': r.weight,
     'Class':        r.freight_class,
-    'Pieces':       r.pieces ?? '',
-    'Commodity':    r.commodity ?? '',
     'Rate':         r.rate ?? '',
     'Transit Days': r.transit_days ?? '',
     'Quote #':      r.quote_number ?? '',
@@ -143,7 +131,7 @@ function downloadResults(rows: QuoteRow[]) {
     'Notes':        r.error ?? '',
   }))
   const ws = XLSX.utils.json_to_sheet(data)
-  ws['!cols'] = [4,12,12,14,8,8,20,12,14,14,10,30].map((w) => ({ wch: w }))
+  ws['!cols'] = [4, 12, 12, 14, 24, 12, 14, 14, 10, 30].map((w) => ({ wch: w }))
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'FFE Quotes')
   XLSX.writeFile(wb, `ffe-quotes-${new Date().toISOString().split('T')[0]}.xlsx`)
@@ -151,10 +139,10 @@ function downloadResults(rows: QuoteRow[]) {
 
 function StatusBadge({ status }: { status: QuoteRow['status'] }) {
   const map = {
-    pending:    { label: 'Pending',       cls: styles.statusPending },
-    processing: { label: 'Processing…',   cls: styles.statusProcessing },
-    complete:   { label: 'Complete',      cls: styles.statusComplete },
-    error:      { label: 'Error',         cls: styles.statusError },
+    pending:    { label: 'Pending',     cls: styles.statusPending },
+    processing: { label: 'Processing…', cls: styles.statusProcessing },
+    complete:   { label: 'Complete',    cls: styles.statusComplete },
+    error:      { label: 'Error',       cls: styles.statusError },
   }
   const { label, cls } = map[status]
   return <span className={`${styles.badge} ${cls}`}>{label}</span>
@@ -162,25 +150,18 @@ function StatusBadge({ status }: { status: QuoteRow['status'] }) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function QuoterPage() {
-  const [step, setStep]                 = useState<Step>('upload')
-  const [parsedRows, setParsedRows]     = useState<ShipmentRow[]>([])
-  const [job, setJob]                   = useState<QuoteJob | null>(null)
-  const [quoteRows, setQuoteRows]       = useState<QuoteRow[]>([])
-  const [uploadError, setUploadError]   = useState<string | null>(null)
-  const [submitError, setSubmitError]   = useState<string | null>(null)
-  const [isDragging, setIsDragging]     = useState(false)
-  const [uploading, setUploading]       = useState(false)
-  const [globalClass, setGlobalClass]   = useState('')
-  const [globalCommodity, setGlobalCommodity] = useState('')
+  const [step, setStep]               = useState<Step>('upload')
+  const [parsedRows, setParsedRows]   = useState<ShipmentRow[]>([])
+  const [job, setJob]                 = useState<QuoteJob | null>(null)
+  const [quoteRows, setQuoteRows]     = useState<QuoteRow[]>([])
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [isDragging, setIsDragging]   = useState(false)
+  const [uploading, setUploading]     = useState(false)
+  const [freightClass, setFreightClass] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const channelRef   = useRef<ReturnType<typeof supabase.channel> | null>(null)
-
-  // Commodity takes priority; class second; spreadsheet value last
-  const effectiveFreightClass = (r: ShipmentRow): string => {
-    if (globalCommodity) return globalCommodity
-    if (globalClass)     return `Class ${globalClass}`
-    return r.freight_class ?? ''
-  }
+  const prevJobId    = useRef<string | null>(null)
 
   // ── Handle file drop/select ──────────────────────────────────────────────────
   const handleFile = useCallback(async (file: File) => {
@@ -214,24 +195,16 @@ export default function QuoterPage() {
   // ── Submit job to Supabase ───────────────────────────────────────────────────
   const submitJob = async () => {
     setSubmitError(null)
-
-    // Validate every row has a class (from UI or spreadsheet)
-    const missingClass = parsedRows.some((r) => !effectiveFreightClass(r))
-    if (missingClass) {
-      setSubmitError(
-        'No freight class set. Either select a Class or Commodity Type above, ' +
-        'or include a "Class" column in your spreadsheet.'
-      )
+    if (!freightClass) {
+      setSubmitError('Please select a Freight Class or Commodity Type before submitting.')
       return
     }
-
     try {
       const { data: jobData, error: jobErr } = await supabase
         .from('quote_jobs')
         .insert({ total_rows: parsedRows.length, status: 'pending' })
         .select()
         .single()
-
       if (jobErr) throw jobErr
 
       const rowInserts = parsedRows.map((r, i) => ({
@@ -240,9 +213,7 @@ export default function QuoterPage() {
         origin_zip:    r.origin_zip,
         dest_zip:      r.dest_zip,
         weight:        r.weight,
-        freight_class: effectiveFreightClass(r),
-        pieces:        r.pieces ?? undefined,
-        commodity:     globalCommodity || r.commodity || undefined,
+        freight_class: freightClass,
         status:        'pending',
       }))
 
@@ -250,55 +221,41 @@ export default function QuoterPage() {
       if (rowsErr) throw rowsErr
 
       setJob(jobData as QuoteJob)
-      setQuoteRows(rowInserts.map((r, i) => ({ ...r, id: '', status: 'pending' as const, row_index: i + 1 })))
+      setQuoteRows(rowInserts.map((r) => ({ ...r, id: '', status: 'pending' as const })))
       setStep('waiting')
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Failed to submit job')
     }
   }
 
-  // ── Subscribe to real-time updates once we have a job ───────────────────────
-  const subscribeToJob = (jobId: string) => {
-    supabase
-      .from('quote_rows')
-      .select('*')
-      .eq('job_id', jobId)
-      .order('row_index')
-      .then(({ data }) => { if (data) setQuoteRows(data as QuoteRow[]) })
-
-    const channel = supabase
-      .channel(`job-${jobId}`)
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'quote_jobs', filter: `id=eq.${jobId}` },
-        (payload) => {
-          const updated = payload.new as QuoteJob
-          setJob(updated)
-          if (updated.status === 'complete' || updated.status === 'error') setStep('done')
-          else if (updated.status === 'running') setStep('running')
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'quote_rows', filter: `job_id=eq.${jobId}` },
-        (payload) => {
-          const updated = payload.new as QuoteRow
-          setQuoteRows((prev) =>
-            prev.map((r) => (r.id === updated.id || r.row_index === updated.row_index ? updated : r))
-          )
-          setStep((s) => s === 'waiting' ? 'running' : s)
-        }
-      )
-      .subscribe()
-
-    channelRef.current = channel
-  }
-
-  // Subscribe when job is created
-  const prevJobId = useRef<string | null>(null)
+  // ── Real-time subscription ───────────────────────────────────────────────────
   if (job?.id && job.id !== prevJobId.current && (step === 'waiting' || step === 'running')) {
     prevJobId.current = job.id
-    subscribeToJob(job.id)
+
+    supabase
+      .from('quote_rows').select('*').eq('job_id', job.id).order('row_index')
+      .then(({ data }) => { if (data) setQuoteRows(data as QuoteRow[]) })
+
+    const ch = supabase
+      .channel(`job-${job.id}`)
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'quote_jobs', filter: `id=eq.${job.id}` },
+        (payload) => {
+          const u = payload.new as QuoteJob
+          setJob(u)
+          if (u.status === 'complete' || u.status === 'error') setStep('done')
+          else if (u.status === 'running') setStep('running')
+        })
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'quote_rows', filter: `job_id=eq.${job.id}` },
+        (payload) => {
+          const u = payload.new as QuoteRow
+          setQuoteRows((prev) => prev.map((r) => (r.id === u.id || r.row_index === u.row_index ? u : r)))
+          setStep((s) => s === 'waiting' ? 'running' : s)
+        })
+      .subscribe()
+
+    channelRef.current = ch
   }
 
   // ── Reset ────────────────────────────────────────────────────────────────────
@@ -332,47 +289,40 @@ export default function QuoterPage() {
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>Step 1 — Upload Shipment Spreadsheet</h2>
 
-          {/* Batch settings */}
-          <div className={styles.batchSettings}>
-            <p className={styles.batchLabel}>Apply to all rows</p>
-            <div className={styles.settingsGrid}>
-              <label className={styles.label}>
-                Freight Class
-                <select
-                  className={styles.select}
-                  value={globalClass}
-                  onChange={(e) => { setGlobalClass(e.target.value); if (e.target.value) setGlobalCommodity('') }}
-                >
-                  <option value="">— use spreadsheet column —</option>
-                  {CLASS_OPTIONS.map((c) => (
-                    <option key={c} value={c}>Class {c}</option>
-                  ))}
-                </select>
-              </label>
-              <label className={styles.label}>
-                Commodity Type <span className={styles.labelMeta}>(overrides Class)</span>
-                <select
-                  className={styles.select}
-                  value={globalCommodity}
-                  onChange={(e) => { setGlobalCommodity(e.target.value); if (e.target.value) setGlobalClass('') }}
-                >
-                  <option value="">— use spreadsheet column —</option>
-                  {COMMODITY_OPTIONS.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
+          <div className={styles.classField}>
+            <label className={styles.classLabel}>
+              Freight Class / Commodity Type <span className={styles.required}>*</span>
+            </label>
+            <p className={styles.classHint}>Select the class or commodity that applies to all shipments in this batch.</p>
+            <select
+              className={`${styles.select} ${!freightClass ? styles.selectEmpty : ''}`}
+              value={freightClass}
+              onChange={(e) => setFreightClass(e.target.value)}
+            >
+              <option value="">— Select class or commodity —</option>
+              <optgroup label="Commodity Type">
+                {COMMODITY_OPTIONS.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Freight Class">
+                {CLASS_OPTIONS.map((c) => (
+                  <option key={c} value={`Class ${c}`}>Class {c}</option>
+                ))}
+              </optgroup>
+            </select>
           </div>
 
           <div className={styles.divider} />
 
           <p className={styles.hint}>
             Formats: <strong>.csv</strong>, <strong>.xlsx</strong>, <strong>.xls</strong><br />
-            Required columns: <code>Origin ZIP</code> · <code>Dest ZIP</code> · <code>Weight</code><br />
-            Optional columns: <code>Class</code> · <code>Pieces</code> · <code>Commodity</code>
-            {!globalClass && !globalCommodity && <> — <em>or select above to skip</em></>}
+            Required columns: <code>Origin ZIP</code> · <code>Dest ZIP</code> · <code>Weight</code>
           </p>
+          <p className={styles.colAliases}>
+            Also accepted — Origin: <em>From Zip, Shipper Zip</em> · Dest: <em>To Zip, Destination Zip, Consignee</em> · Weight: <em>Gross Weight, Total Weight</em>
+          </p>
+
           <div
             className={`${styles.dropzone} ${isDragging ? styles.dragging : ''}`}
             onClick={() => fileInputRef.current?.click()}
@@ -398,19 +348,13 @@ export default function QuoterPage() {
       {step === 'preview' && (
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>Step 2 — Review &amp; Submit</h2>
-
-          {(globalCommodity || globalClass) && (
-            <div className={styles.batchBadge}>
-              Applying to all rows:{' '}
-              <strong>{globalCommodity || `Class ${globalClass}`}</strong>
-            </div>
-          )}
-
+          <div className={styles.batchBadge}>
+            Applying to all rows: <strong>{freightClass}</strong>
+          </div>
           <p className={styles.hint}>
-            {parsedRows.length} shipment{parsedRows.length !== 1 ? 's' : ''} parsed.
-            Submitting creates the job in Supabase — make sure your Python worker is running.
+            {parsedRows.length} shipment{parsedRows.length !== 1 ? 's' : ''} parsed. Make sure your Python worker is running before submitting.
           </p>
-          <ShipmentPreviewTable rows={parsedRows} effectiveClass={effectiveFreightClass} />
+          <ShipmentPreviewTable rows={parsedRows} />
           {submitError && <p className={styles.errorMsg}>{submitError}</p>}
           <div className={styles.actions}>
             <button className={styles.btnSecondary} onClick={() => setStep('upload')}>Back</button>
@@ -421,19 +365,17 @@ export default function QuoterPage() {
         </div>
       )}
 
-      {/* ── STEP 3: Waiting for worker ── */}
+      {/* ── STEP 3: Waiting ── */}
       {step === 'waiting' && (
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>Waiting for Worker…</h2>
           <p className={styles.hint}>
             Job <code className={styles.jobId}>{job?.id}</code> is in the queue.<br />
-            Start your Python worker if it's not already running:
+            Start your Python worker if it's not running:
           </p>
           <pre className={styles.codeBlock}>cd python && python worker.py</pre>
           <p className={styles.hint}>The page will update automatically once the worker picks it up.</p>
-          <div className={styles.waitSpinnerRow}>
-            <span className={styles.spinner} />
-          </div>
+          <div className={styles.waitSpinnerRow}><span className={styles.spinner} /></div>
         </div>
       )}
 
@@ -453,7 +395,7 @@ export default function QuoterPage() {
             ? <>
                 <h2 className={`${styles.cardTitle} ${styles.errorTitle}`}>Worker Error</h2>
                 <p className={styles.errorMsg}>{job.error}</p>
-                <p className={styles.hint}>Check <code>python/screenshots/</code> for debug screenshots.<br />Most fixes are in <code>python/ffe-selectors.json</code>.</p>
+                <p className={styles.hint}>Check <code>python/screenshots/</code> for debug screenshots.</p>
               </>
             : <>
                 <h2 className={styles.cardTitle}>Done!</h2>
@@ -511,18 +453,12 @@ function ProgressBar({ pct, done, total }: { pct: number; done: number; total: n
   )
 }
 
-function ShipmentPreviewTable({
-  rows,
-  effectiveClass,
-}: {
-  rows: ShipmentRow[]
-  effectiveClass: (r: ShipmentRow) => string
-}) {
+function ShipmentPreviewTable({ rows }: { rows: ShipmentRow[] }) {
   return (
     <div className={styles.tableWrapper}>
       <table className={styles.table}>
         <thead>
-          <tr><th>#</th><th>Origin ZIP</th><th>Dest ZIP</th><th>Weight</th><th>Class / Commodity</th><th>Pieces</th></tr>
+          <tr><th>#</th><th>Origin ZIP</th><th>Dest ZIP</th><th>Weight (lbs)</th></tr>
         </thead>
         <tbody>
           {rows.slice(0, 50).map((r, i) => (
@@ -531,8 +467,6 @@ function ShipmentPreviewTable({
               <td>{r.origin_zip}</td>
               <td>{r.dest_zip}</td>
               <td>{r.weight}</td>
-              <td>{effectiveClass(r) || <span className={styles.noClass}>not set</span>}</td>
-              <td>{r.pieces ?? '—'}</td>
             </tr>
           ))}
         </tbody>
@@ -547,7 +481,7 @@ function ResultsTable({ rows }: { rows: QuoteRow[] }) {
     <div className={styles.tableWrapper}>
       <table className={styles.table}>
         <thead>
-          <tr><th>#</th><th>Origin</th><th>Dest</th><th>Weight</th><th>Class / Commodity</th><th>Status</th><th>Rate</th><th>Transit</th><th>Quote #</th><th>Notes</th></tr>
+          <tr><th>#</th><th>Origin</th><th>Dest</th><th>Weight</th><th>Status</th><th>Rate</th><th>Transit</th><th>Quote #</th><th>Notes</th></tr>
         </thead>
         <tbody>
           {rows.map((r) => (
@@ -556,7 +490,6 @@ function ResultsTable({ rows }: { rows: QuoteRow[] }) {
               <td>{r.origin_zip}</td>
               <td>{r.dest_zip}</td>
               <td>{r.weight}</td>
-              <td>{r.freight_class}</td>
               <td><StatusBadge status={r.status} /></td>
               <td className={styles.rateCell}>{r.rate ?? '—'}</td>
               <td>{r.transit_days ?? '—'}</td>

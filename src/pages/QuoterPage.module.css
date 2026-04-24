@@ -113,40 +113,40 @@
   font-size: 0.85em;
 }
 
-/* ── Batch settings ── */
-.batchSettings {
+/* ── Class / commodity selector ── */
+.classField {
   margin-bottom: 20px;
 }
 
-.batchLabel {
-  font-size: 0.78rem;
+.classLabel {
+  display: block;
+  font-size: 0.95rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  color: var(--color-neutral-800);
+  margin-bottom: 4px;
+}
+
+.required {
+  color: var(--color-error-500);
+}
+
+.classHint {
+  font-size: 0.83rem;
   color: var(--color-neutral-400);
   margin-bottom: 10px;
-}
-
-.settingsGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-@media (max-width: 600px) {
-  .settingsGrid { grid-template-columns: 1fr; }
 }
 
 .select {
   padding: 10px 14px;
   border: 1px solid var(--color-neutral-300);
   border-radius: 8px;
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   color: var(--color-neutral-900);
   background: #fff;
   transition: border-color 0.15s;
   outline: none;
   width: 100%;
+  max-width: 480px;
   cursor: pointer;
 }
 
@@ -155,16 +155,21 @@
   box-shadow: 0 0 0 3px var(--color-primary-100);
 }
 
-.labelMeta {
-  font-weight: 400;
+.selectEmpty {
   color: var(--color-neutral-400);
-  font-size: 0.8em;
 }
 
 .divider {
   height: 1px;
   background: var(--color-neutral-100);
   margin: 20px 0;
+}
+
+.colAliases {
+  font-size: 0.8rem;
+  color: var(--color-neutral-400);
+  margin-bottom: 16px;
+  line-height: 1.5;
 }
 
 .batchBadge {
@@ -176,12 +181,6 @@
   padding: 8px 14px;
   font-size: 0.88rem;
   margin-bottom: 16px;
-}
-
-.noClass {
-  color: var(--color-error-500);
-  font-style: italic;
-  font-size: 0.85em;
 }
 
 /* ── Dropzone ── */
