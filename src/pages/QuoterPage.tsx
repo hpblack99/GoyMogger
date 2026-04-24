@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
 import styles from './QuoterPage.module.css'
@@ -161,7 +161,6 @@ export default function QuoterPage() {
   const [freightClass, setFreightClass] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const channelRef   = useRef<ReturnType<typeof supabase.channel> | null>(null)
-  const prevJobId    = useRef<string | null>(null)
 
   // ── Handle file drop/select ──────────────────────────────────────────────────
   const handleFile = useCallback(async (file: File) => {
@@ -228,15 +227,24 @@ export default function QuoterPage() {
     }
   }
 
-  // ── Real-time subscription ───────────────────────────────────────────────────
-  if (job?.id && job.id !== prevJobId.current && (step === 'waiting' || step === 'running')) {
-    prevJobId.current = job.id
+  // ── Real-time subscription + polling fallback ────────────────────────────────
+  useEffect(() => {
+    if (!job?.id || step === 'upload' || step === 'preview' || step === 'done') return
 
-    supabase
-      .from('quote_rows').select('*').eq('job_id', job.id).order('row_index')
+    // Fetch current state immediately in case worker already finished
+    supabase.from('quote_rows').select('*').eq('job_id', job.id).order('row_index')
       .then(({ data }) => { if (data) setQuoteRows(data as QuoteRow[]) })
 
-    const ch = supabase
+    supabase.from('quote_jobs').select('*').eq('id', job.id).single()
+      .then(({ data }) => {
+        if (!data) return
+        setJob(data as QuoteJob)
+        if (data.status === 'complete' || data.status === 'error') setStep('done')
+        else if (data.status === 'running') setStep('running')
+      })
+
+    // Realtime channel
+    const channel = supabase
       .channel(`job-${job.id}`)
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'quote_jobs', filter: `id=eq.${job.id}` },
@@ -255,13 +263,32 @@ export default function QuoterPage() {
         })
       .subscribe()
 
-    channelRef.current = ch
-  }
+    channelRef.current = channel
+
+    // Polling fallback — catches updates if realtime delivery lags
+    const poll = setInterval(async () => {
+      const { data: jobData } = await supabase.from('quote_jobs').select('*').eq('id', job.id).single()
+      if (!jobData) return
+      setJob(jobData as QuoteJob)
+      if (jobData.status === 'complete' || jobData.status === 'error') {
+        const { data: rowData } = await supabase.from('quote_rows').select('*').eq('job_id', job.id).order('row_index')
+        if (rowData) setQuoteRows(rowData as QuoteRow[])
+        setStep('done')
+        clearInterval(poll)
+      } else if (jobData.status === 'running') {
+        setStep('running')
+      }
+    }, 3000)
+
+    return () => {
+      supabase.removeChannel(channel)
+      clearInterval(poll)
+    }
+  }, [job?.id, step === 'upload' || step === 'preview']) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Reset ────────────────────────────────────────────────────────────────────
   const reset = () => {
     if (channelRef.current) supabase.removeChannel(channelRef.current)
-    prevJobId.current = null
     setStep('upload')
     setParsedRows([])
     setJob(null)
