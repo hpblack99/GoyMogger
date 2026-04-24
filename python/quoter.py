@@ -81,7 +81,7 @@ class FFEQuoter:
     def __enter__(self):
         self._playwright = sync_playwright().start()
         self._browser = self._playwright.chromium.launch(
-            headless=not self.debug,
+            headless=False,  # TODO: change back to `not self.debug` when done debugging
             slow_mo=300 if self.debug else 0,
         )
         self._context = self._browser.new_context(
@@ -180,13 +180,11 @@ class FFEQuoter:
         self.page.fill(cfg["dest_zip"],   str(row["dest_zip"]).strip())
 
         # ── Weight ───────────────────────────────────────────────────────────
-        # The field defaults to 0; clear it first then type the value
-        weight_el = self.page.query_selector(cfg["weight"])
-        if weight_el:
-            weight_el.triple_click()
-            weight_el.type(str(int(float(str(row["weight"])))))
-        else:
+        # page.fill() clears the field before typing, overwriting the default 0
+        weight_str = str(int(float(str(row["weight"]))))
+        if not self.page.query_selector(cfg["weight"]):
             raise RuntimeError(f"Weight field '{cfg['weight']}' not found on form.")
+        self.page.fill(cfg["weight"], weight_str)
 
         # ── Freight class / commodity → FFE select option ────────────────────
         _select_class_option(self.page, cfg["freight_class"], str(row["freight_class"]))
