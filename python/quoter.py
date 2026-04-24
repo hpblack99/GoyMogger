@@ -192,6 +192,9 @@ class FFEQuoter:
         _screenshot(self.page, f"05-form-filled-row{row['row_index']}")
 
         # ── Submit ────────────────────────────────────────────────────────────
+        # First click activates FFE's JS validation; second click submits.
+        self.page.click(cfg["submit"])
+        self.page.wait_for_timeout(600)
         with self.page.expect_navigation(wait_until="networkidle", timeout=45_000):
             self.page.click(cfg["submit"])
 
