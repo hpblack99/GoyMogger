@@ -152,6 +152,7 @@ function StatusBadge({ status }: { status: QuoteRow['status'] }) {
 export default function QuoterPage() {
   const [step, setStep]               = useState<Step>('upload')
   const [parsedRows, setParsedRows]   = useState<ShipmentRow[]>([])
+  const [fileName, setFileName]       = useState<string | null>(null)
   const [job, setJob]                 = useState<QuoteJob | null>(null)
   const [quoteRows, setQuoteRows]     = useState<QuoteRow[]>([])
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -170,7 +171,8 @@ export default function QuoterPage() {
       const rows = await parseXlsx(file)
       if (!rows.length) throw new Error('No valid data rows found.')
       setParsedRows(rows)
-      setStep('preview')
+      setFileName(file.name)
+      // Stay on upload step — user must also select a class before continuing
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Failed to parse file')
     } finally {
@@ -291,11 +293,16 @@ export default function QuoterPage() {
     if (channelRef.current) supabase.removeChannel(channelRef.current)
     setStep('upload')
     setParsedRows([])
+    setFileName(null)
     setJob(null)
     setQuoteRows([])
     setUploadError(null)
     setSubmitError(null)
   }
+
+  const hasClass = freightClass !== ''
+  const hasFile  = parsedRows.length > 0
+  const canContinue = hasClass && hasFile
 
   const pct       = job ? Math.round((job.done_rows / job.total_rows) * 100) : 0
   const completed = quoteRows.filter((r) => r.status === 'complete').length
@@ -314,60 +321,102 @@ export default function QuoterPage() {
       {/* ── STEP 1: Upload ── */}
       {step === 'upload' && (
         <div className={styles.card}>
-          <h2 className={styles.cardTitle}>Step 1 — Upload Shipment Spreadsheet</h2>
+          <h2 className={styles.cardTitle}>Step 1 — Set Up Your Batch</h2>
 
-          <div className={styles.classField}>
-            <label className={styles.classLabel}>
-              Freight Class / Commodity Type <span className={styles.required}>*</span>
-            </label>
-            <p className={styles.classHint}>Select the class or commodity that applies to all shipments in this batch.</p>
-            <select
-              className={`${styles.select} ${!freightClass ? styles.selectEmpty : ''}`}
-              value={freightClass}
-              onChange={(e) => setFreightClass(e.target.value)}
-            >
-              <option value="">— Select class or commodity —</option>
-              <optgroup label="Commodity Type">
-                {COMMODITY_OPTIONS.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </optgroup>
-              <optgroup label="Freight Class">
-                {CLASS_OPTIONS.map((c) => (
-                  <option key={c} value={`Class ${c}`}>Class {c}</option>
-                ))}
-              </optgroup>
-            </select>
+          {/* ── 1a: Class selector ── */}
+          <div className={`${styles.checkRow} ${hasClass ? styles.checkRowDone : ''}`}>
+            <div className={styles.checkIcon}>{hasClass ? '✓' : '1'}</div>
+            <div className={styles.checkBody}>
+              <label className={styles.classLabel}>
+                Freight Class / Commodity Type
+              </label>
+              <p className={styles.classHint}>Applies to every shipment in this batch.</p>
+              <select
+                className={`${styles.select} ${!hasClass ? styles.selectEmpty : ''}`}
+                value={freightClass}
+                onChange={(e) => setFreightClass(e.target.value)}
+              >
+                <option value="">— Select class or commodity —</option>
+                <optgroup label="Commodity Type">
+                  {COMMODITY_OPTIONS.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Freight Class">
+                  {CLASS_OPTIONS.map((c) => (
+                    <option key={c} value={`Class ${c}`}>Class {c}</option>
+                  ))}
+                </optgroup>
+              </select>
+            </div>
           </div>
 
           <div className={styles.divider} />
 
-          <p className={styles.hint}>
-            Formats: <strong>.csv</strong>, <strong>.xlsx</strong>, <strong>.xls</strong><br />
-            Required columns: <code>Origin ZIP</code> · <code>Dest ZIP</code> · <code>Weight</code>
-          </p>
-          <p className={styles.colAliases}>
-            Also accepted — Origin: <em>From Zip, Shipper Zip</em> · Dest: <em>To Zip, Destination Zip, Consignee</em> · Weight: <em>Gross Weight, Total Weight</em>
-          </p>
+          {/* ── 1b: File upload ── */}
+          <div className={`${styles.checkRow} ${hasFile ? styles.checkRowDone : ''}`}>
+            <div className={styles.checkIcon}>{hasFile ? '✓' : '2'}</div>
+            <div className={styles.checkBody}>
+              <p className={styles.classLabel}>Shipment Spreadsheet</p>
+              <p className={styles.classHint}>
+                Required columns: <code>Origin ZIP</code> · <code>Dest ZIP</code> · <code>Weight</code><br />
+                <span className={styles.colAliasInline}>Also: From Zip, To Zip, Gross Weight, etc.</span>
+              </p>
 
-          <div
-            className={`${styles.dropzone} ${isDragging ? styles.dragging : ''}`}
-            onClick={() => fileInputRef.current?.click()}
-            onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={onDrop}
-          >
-            {uploading
-              ? <span className={styles.spinner} />
-              : <>
-                  <span className={styles.dropIcon}>📂</span>
-                  <span className={styles.dropText}>
-                    {isDragging ? 'Drop it!' : 'Drag & drop your spreadsheet here, or click to browse'}
-                  </span>
-                </>}
+              {hasFile ? (
+                <div className={styles.fileConfirm}>
+                  <span className={styles.fileIcon}>📄</span>
+                  <span className={styles.fileName}>{fileName}</span>
+                  <span className={styles.fileCount}>{parsedRows.length} row{parsedRows.length !== 1 ? 's' : ''}</span>
+                  <button
+                    className={styles.changeFile}
+                    onClick={() => { setParsedRows([]); setFileName(null); setUploadError(null); fileInputRef.current?.click() }}
+                  >
+                    Change
+                  </button>
+                </div>
+              ) : (
+                <div
+                  className={`${styles.dropzone} ${isDragging ? styles.dragging : ''}`}
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={onDrop}
+                >
+                  {uploading
+                    ? <span className={styles.spinner} />
+                    : <>
+                        <span className={styles.dropIcon}>📂</span>
+                        <span className={styles.dropText}>
+                          {isDragging ? 'Drop it!' : 'Drag & drop .csv / .xlsx / .xls, or click to browse'}
+                        </span>
+                      </>}
+                </div>
+              )}
+
+              <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" style={{ display: 'none' }} onChange={onFileInput} />
+              {uploadError && <p className={styles.errorMsg}>{uploadError}</p>}
+            </div>
           </div>
-          <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" style={{ display: 'none' }} onChange={onFileInput} />
-          {uploadError && <p className={styles.errorMsg}>{uploadError}</p>}
+
+          <div className={styles.divider} />
+
+          <div className={styles.actions}>
+            <button
+              className={styles.btnPrimary}
+              disabled={!canContinue}
+              onClick={() => setStep('preview')}
+            >
+              Continue to Preview →
+            </button>
+            {!canContinue && (
+              <span className={styles.continueHint}>
+                {!hasClass && !hasFile ? 'Select a class and upload a file to continue'
+                  : !hasClass ? 'Select a freight class or commodity to continue'
+                  : 'Upload a spreadsheet to continue'}
+              </span>
+            )}
+          </div>
         </div>
       )}
 

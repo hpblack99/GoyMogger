@@ -113,6 +113,98 @@
   font-size: 0.85em;
 }
 
+/* ── Checklist rows (class + file) ── */
+.checkRow {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.checkIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-neutral-200);
+  color: var(--color-neutral-500);
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.checkRowDone .checkIcon {
+  background: var(--color-success-500);
+  color: #fff;
+}
+
+.checkBody {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── File confirmed state ── */
+.fileConfirm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-neutral-50);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-top: 4px;
+}
+
+.fileIcon {
+  font-size: 1.2rem;
+}
+
+.fileName {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-neutral-800);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileCount {
+  font-size: 0.82rem;
+  color: var(--color-neutral-500);
+  white-space: nowrap;
+}
+
+.changeFile {
+  background: none;
+  border: none;
+  color: var(--color-primary-600);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+}
+
+.changeFile:hover {
+  text-decoration: underline;
+}
+
+/* ── Continue hint ── */
+.continueHint {
+  font-size: 0.83rem;
+  color: var(--color-neutral-400);
+  align-self: center;
+}
+
+.colAliasInline {
+  color: var(--color-neutral-400);
+  font-size: 0.8em;
+}
+
 /* ── Class / commodity selector ── */
 .classField {
   margin-bottom: 20px;
