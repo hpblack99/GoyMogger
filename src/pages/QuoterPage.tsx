@@ -341,11 +341,11 @@ export default function QuoterPage() {
           <h2 className={styles.cardTitle}>Step 1 — Set Up Your Batch</h2>
 
           <div className={styles.nameField}>
-            <label className={styles.classLabel}>Quote Name / Company</label>
+            <label className={styles.classLabel}>Company Name</label>
             <input
               type="text"
               className={styles.input}
-              placeholder="e.g. Acme Foods — April batch"
+              placeholder="e.g. Acme Foods"
               value={quoteName}
               onChange={(e) => setQuoteName(e.target.value)}
               maxLength={120}
@@ -489,7 +489,7 @@ export default function QuoterPage() {
       {step === 'running' && job && (
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>Quoting in Progress…</h2>
-          <ProgressBar pct={pct} done={job.done_rows} total={job.total_rows} />
+          <ProgressBar pct={pct} done={job.done_rows} total={job.total_rows} completed={completed} processing={quoteRows.filter((r) => r.status === 'processing').length} errors={errors} />
           <ResultsTable rows={quoteRows} />
         </div>
       )}
@@ -548,13 +548,24 @@ function StepIndicator({ current }: { current: Step }) {
   )
 }
 
-function ProgressBar({ pct, done, total }: { pct: number; done: number; total: number }) {
+function ProgressBar({ pct, done, total, completed, errors, processing }: { pct: number; done: number; total: number; completed: number; errors: number; processing: number }) {
+  const completedPct = (completed / total) * 100
+  const errorsPct = (errors / total) * 100
+  const processingPct = (processing / total) * 100
+
   return (
     <div className={styles.progressSection}>
       <div className={styles.progressBar}>
-        <div className={styles.progressFill} style={{ width: `${pct}%` }} />
+        <div className={`${styles.progressFill} ${styles.progressComplete}`} style={{ width: `${completedPct}%` }} />
+        <div className={`${styles.progressFill} ${styles.progressError}`} style={{ width: `${errorsPct}%` }} />
+        <div className={`${styles.progressFill} ${styles.progressProcessing}`} style={{ width: `${processingPct}%` }} />
       </div>
       <p className={styles.progressLabel}>{done} / {total} ({pct}%)</p>
+      <div className={styles.progressStats}>
+        <span className={styles.progressStat}><span className={styles.statDot} style={{ backgroundColor: 'var(--color-success-500)' }} />Complete: {completed}</span>
+        <span className={styles.progressStat}><span className={styles.statDot} style={{ backgroundColor: 'var(--color-primary-500)' }} />Processing: {processing}</span>
+        <span className={styles.progressStat}><span className={styles.statDot} style={{ backgroundColor: 'var(--color-error-500)' }} />Errors: {errors}</span>
+      </div>
     </div>
   )
 }

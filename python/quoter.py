@@ -176,8 +176,10 @@ class FFEQuoter:
         cfg = CONFIG["quote_form"]
 
         # ── Origin / destination ──────────────────────────────────────────────
-        self.page.fill(cfg["origin_zip"], str(row["origin_zip"]).strip())
-        self.page.fill(cfg["dest_zip"],   str(row["dest_zip"]).strip())
+        origin_zip_padded = str(row["origin_zip"]).strip().zfill(5)
+        dest_zip_padded = str(row["dest_zip"]).strip().zfill(5)
+        self.page.fill(cfg["origin_zip"], origin_zip_padded)
+        self.page.fill(cfg["dest_zip"],   dest_zip_padded)
 
         # ── Weight ───────────────────────────────────────────────────────────
         # page.fill() clears the field before typing, overwriting the default 0

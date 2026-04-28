@@ -432,6 +432,39 @@
 .progressLabel {
   font-size: 0.85rem;
   color: var(--color-neutral-500);
+  margin-bottom: 8px;
+}
+
+.progressComplete {
+  background: var(--color-success-500) !important;
+}
+
+.progressProcessing {
+  background: var(--color-primary-500) !important;
+}
+
+.progressError {
+  background: var(--color-error-500) !important;
+}
+
+.progressStats {
+  display: flex;
+  gap: 20px;
+  font-size: 0.83rem;
+  color: var(--color-neutral-600);
+}
+
+.progressStat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.statDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
 }
 
 /* ── Waiting state ── */
