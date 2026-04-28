@@ -250,12 +250,28 @@ class FFEQuoter:
         self.navigate_to_rate_request()
 
         for i, row in enumerate(rows):
-            try:
-                result = self.get_quote(row)
-                on_row_done(row["id"], result, None)
-            except Exception as exc:
-                _screenshot(self.page, f"error-row{row['row_index']}")
-                on_row_done(row["id"], {}, str(exc))
+            result: dict = {}
+            error: str | None = None
+
+            for attempt in range(2):
+                try:
+                    result = self.get_quote(row)
+                    error = None
+                    break
+                except Exception as exc:
+                    error = str(exc)
+                    _screenshot(self.page, f"error-attempt{attempt + 1}-row{row['row_index']}")
+                    if attempt == 0:
+                        short = error[:100].replace('\n', ' ')
+                        print(f"  [retry] Row {row['row_index']} attempt 1 failed: {short}")
+                        print(f"  [retry] Waiting 3s then retrying row {row['row_index']}…")
+                        try:
+                            self.navigate_to_rate_request()
+                        except Exception:
+                            pass
+                        time.sleep(3)
+
+            on_row_done(row["id"], result, error)
 
             if i < len(rows) - 1:
                 time.sleep(DELAY_BETWEEN_QUOTES)

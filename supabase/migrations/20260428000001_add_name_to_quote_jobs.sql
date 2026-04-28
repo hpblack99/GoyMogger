@@ -1,0 +1,1 @@
+ALTER TABLE quote_jobs ADD COLUMN IF NOT EXISTS name TEXT;

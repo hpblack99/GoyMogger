@@ -160,6 +160,7 @@ export default function QuoterPage() {
   const [isDragging, setIsDragging]   = useState(false)
   const [uploading, setUploading]     = useState(false)
   const [freightClass, setFreightClass] = useState('')
+  const [quoteName, setQuoteName]       = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const channelRef   = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
@@ -203,7 +204,7 @@ export default function QuoterPage() {
     try {
       const { data: jobData, error: jobErr } = await supabase
         .from('quote_jobs')
-        .insert({ total_rows: parsedRows.length, status: 'pending' })
+        .insert({ total_rows: parsedRows.length, status: 'pending', name: quoteName.trim() || null })
         .select()
         .single()
       if (jobErr) throw jobErr
@@ -298,6 +299,7 @@ export default function QuoterPage() {
     setQuoteRows([])
     setUploadError(null)
     setSubmitError(null)
+    setQuoteName('')
   }
 
   const hasClass = freightClass !== ''
@@ -322,6 +324,19 @@ export default function QuoterPage() {
       {step === 'upload' && (
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>Step 1 — Set Up Your Batch</h2>
+
+          <div className={styles.nameField}>
+            <label className={styles.classLabel}>Quote Name / Company</label>
+            <input
+              type="text"
+              className={styles.input}
+              placeholder="e.g. Acme Foods — April batch"
+              value={quoteName}
+              onChange={(e) => setQuoteName(e.target.value)}
+              maxLength={120}
+            />
+          </div>
+          <div className={styles.divider} />
 
           {/* ── 1a: Class selector ── */}
           <div className={`${styles.checkRow} ${hasClass ? styles.checkRowDone : ''}`}>

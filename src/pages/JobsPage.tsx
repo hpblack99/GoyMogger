@@ -5,6 +5,7 @@ import styles from './JobsPage.module.css'
 
 interface QuoteJob {
   id: string
+  name?: string
   status: 'pending' | 'running' | 'complete' | 'error'
   total_rows: number
   done_rows: number
@@ -99,7 +100,7 @@ export default function JobsPage() {
     <div className={styles.page}>
       <div className={styles.pageHeader}>
         <div>
-          <h1 className={styles.pageTitle}>Quote Jobs</h1>
+          <h1 className={styles.pageTitle}>All Quotes</h1>
           <p className={styles.pageSubtitle}>Manage and monitor all FFE quoting jobs.</p>
         </div>
         <Link to="/quoter" className={styles.btnPrimary}>+ New Job</Link>
@@ -134,7 +135,7 @@ export default function JobsPage() {
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>Job ID</th>
+                <th>Quote Name</th>
                 <th>Submitted</th>
                 <th>Status</th>
                 <th>Progress</th>
@@ -154,7 +155,7 @@ export default function JobsPage() {
                   <tr key={j.id} className={isDeleting ? styles.rowFading : ''}>
                     <td>
                       <Link to={`/jobs/${j.id}`} className={styles.jobLink}>
-                        {j.id.slice(0, 8).toUpperCase()}
+                        {j.name || j.id.slice(0, 8).toUpperCase()}
                       </Link>
                       {j.error && (
                         <p className={styles.errorSnippet} title={j.error}>

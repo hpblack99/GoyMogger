@@ -5,6 +5,7 @@ import styles from './HomePage.module.css'
 
 interface JobSummary {
   id: string
+  name?: string
   status: 'pending' | 'running' | 'complete' | 'error'
   total_rows: number
   done_rows: number
@@ -46,7 +47,7 @@ export default function HomePage() {
   const loadJobs = () =>
     supabase
       .from('quote_jobs')
-      .select('id, status, total_rows, done_rows, created_at')
+      .select('id, name, status, total_rows, done_rows, created_at')
       .order('created_at', { ascending: false })
       .then(({ data }) => { setJobs((data as JobSummary[]) ?? []); setLoading(false) })
 
@@ -71,12 +72,12 @@ export default function HomePage() {
             Upload shipment spreadsheets, get reefer LTL rates from Frozen Food Express automatically.
           </p>
         </div>
-        <Link to="/quoter" className={styles.ctaBtn}>Submit New Quote Job →</Link>
+        <Link to="/quoter" className={styles.ctaBtn}>+ New Quote</Link>
       </div>
 
       {/* Stats */}
       <div className={styles.statsGrid}>
-        <StatCard label="Total Jobs" value={loading ? '—' : stats.total} />
+        <StatCard label="Total Quotes" value={loading ? '—' : stats.total} />
         <StatCard label="Active Now" value={loading ? '—' : stats.active} highlight={stats.active > 0} />
         <StatCard label="Completed" value={loading ? '—' : stats.complete} />
         <StatCard label="Rows Quoted" value={loading ? '—' : stats.totalRowsQuoted.toLocaleString()} />
@@ -85,8 +86,8 @@ export default function HomePage() {
       {/* Recent jobs */}
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>Recent Jobs</h2>
-          <Link to="/jobs" className={styles.viewAll}>Manage all jobs →</Link>
+          <h2 className={styles.sectionTitle}>Recent Quotes</h2>
+          <Link to="/jobs" className={styles.viewAll}>Manage all quotes →</Link>
         </div>
 
         {loading ? (
@@ -101,7 +102,7 @@ export default function HomePage() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Job ID</th>
+                  <th>Quote Name</th>
                   <th>Submitted</th>
                   <th>Status</th>
                   <th>Progress</th>
@@ -113,7 +114,7 @@ export default function HomePage() {
                   const pct = j.total_rows > 0 ? Math.round((j.done_rows / j.total_rows) * 100) : 0
                   return (
                     <tr key={j.id}>
-                      <td className={styles.jobIdCell}>{j.id.slice(0, 8).toUpperCase()}</td>
+                      <td className={styles.jobIdCell}>{j.name || j.id.slice(0, 8).toUpperCase()}</td>
                       <td className={styles.dateCell}>{fmtDate(j.created_at)}</td>
                       <td><JobBadge status={j.status} /></td>
                       <td>

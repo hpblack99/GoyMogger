@@ -9,7 +9,7 @@
 
 /* ── Header card ── */
 .headerCard {
-  background: #fff;
+  background: var(--color-surface);
   border: 1px solid var(--color-neutral-200);
   border-radius: 12px;
   padding: 24px;
@@ -124,7 +124,7 @@
   transition: all 0.15s;
 }
 .filterTab:hover { background: var(--color-neutral-200); }
-.filterTabActive { background: #fff !important; color: var(--color-neutral-900); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.filterTabActive { background: var(--color-neutral-200) !important; color: var(--color-neutral-900); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
 
 .filterCount {
   display: inline-flex; align-items: center; justify-content: center;
@@ -136,7 +136,7 @@
 
 /* ── Table ── */
 .tableCard {
-  background: #fff;
+  background: var(--color-surface);
   border: 1px solid var(--color-neutral-200);
   border-radius: 12px;
   overflow: hidden;
@@ -220,3 +220,10 @@
   border-radius: 50%; animation: spin 0.7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+.jobName {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--color-neutral-900);
+  margin-bottom: 8px;
+}

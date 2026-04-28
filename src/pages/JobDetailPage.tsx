@@ -6,6 +6,7 @@ import styles from './JobDetailPage.module.css'
 
 interface QuoteJob {
   id: string
+  name?: string
   status: 'pending' | 'running' | 'complete' | 'error'
   total_rows: number
   done_rows: number
@@ -81,7 +82,7 @@ function downloadXlsx(job: QuoteJob, rows: QuoteRow[]) {
   ws['!cols'] = [4, 12, 12, 14, 8, 8, 20, 12, 14, 14, 10, 30].map((w) => ({ wch: w }))
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'FFE Quotes')
-  XLSX.writeFile(wb, `ffe-quotes-${job.id.slice(0, 8)}-${new Date().toISOString().split('T')[0]}.xlsx`)
+  XLSX.writeFile(wb, `ffe-quotes-${(job.name || job.id.slice(0, 8)).replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.xlsx`)
 }
 
 export default function JobDetailPage() {
@@ -189,6 +190,7 @@ export default function JobDetailPage() {
       <div className={styles.headerCard}>
         <div className={styles.headerTop}>
           <div className={styles.headerMeta}>
+            {job_.name && <h2 className={styles.jobName}>{job_.name}</h2>}
             <div className={styles.headerTitleRow}>
               <h1 className={styles.jobTitle}>Job {job_.id.slice(0, 8).toUpperCase()}</h1>
               <JobBadge status={job_.status} />
