@@ -101,9 +101,9 @@ export default function JobsPage() {
       <div className={styles.pageHeader}>
         <div>
           <h1 className={styles.pageTitle}>All Quotes</h1>
-          <p className={styles.pageSubtitle}>Manage and monitor all FFE quoting jobs.</p>
+          <p className={styles.pageSubtitle}>Manage and monitor all FFE quoting bids.</p>
         </div>
-        <Link to="/quoter" className={styles.btnPrimary}>+ New Job</Link>
+        <Link to="/quoter" className={styles.btnPrimary}>+ New Bid</Link>
       </div>
 
       {/* Filter tabs */}
@@ -127,8 +127,8 @@ export default function JobsPage() {
         <div className={styles.emptyState}><span className={styles.spinner} /></div>
       ) : filtered.length === 0 ? (
         <div className={styles.emptyState}>
-          <p className={styles.emptyText}>No {filter === 'all' ? '' : filter + ' '}jobs found.</p>
-          {filter === 'all' && <Link to="/quoter" className={styles.btnPrimary}>Submit your first job →</Link>}
+          <p className={styles.emptyText}>No {filter === 'all' ? '' : filter + ' '}bids found.</p>
+          {filter === 'all' && <Link to="/quoter" className={styles.btnPrimary}>Submit your first bid →</Link>}
         </div>
       ) : (
         <div className={styles.tableCard}>

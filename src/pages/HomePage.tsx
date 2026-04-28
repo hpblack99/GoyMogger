@@ -77,7 +77,7 @@ export default function HomePage() {
 
       {/* Stats */}
       <div className={styles.statsGrid}>
-        <StatCard label="Total Quotes" value={loading ? '—' : stats.total} />
+        <StatCard label="Total Bids" value={loading ? '—' : stats.total} />
         <StatCard label="Active Now" value={loading ? '—' : stats.active} highlight={stats.active > 0} />
         <StatCard label="Completed" value={loading ? '—' : stats.complete} />
         <StatCard label="Rows Quoted" value={loading ? '—' : stats.totalRowsQuoted.toLocaleString()} />
@@ -86,16 +86,16 @@ export default function HomePage() {
       {/* Recent jobs */}
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>Recent Quotes</h2>
-          <Link to="/jobs" className={styles.viewAll}>Manage all quotes →</Link>
+          <h2 className={styles.sectionTitle}>Recent Bids</h2>
+          <Link to="/jobs" className={styles.viewAll}>Manage all bids →</Link>
         </div>
 
         {loading ? (
           <div className={styles.emptyState}><span className={styles.spinner} /></div>
         ) : jobs.length === 0 ? (
           <div className={styles.emptyState}>
-            <p className={styles.emptyText}>No jobs submitted yet.</p>
-            <Link to="/quoter" className={styles.ctaBtn}>Submit your first job →</Link>
+            <p className={styles.emptyText}>No bids submitted yet.</p>
+            <Link to="/quoter" className={styles.ctaBtn}>Submit your first bid →</Link>
           </div>
         ) : (
           <div className={styles.tableCard}>

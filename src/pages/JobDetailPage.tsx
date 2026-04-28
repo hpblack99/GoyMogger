@@ -187,8 +187,8 @@ export default function JobDetailPage() {
 
   if (notFound) return (
     <div className={styles.centered}>
-      <p className={styles.notFoundText}>Job not found.</p>
-      <Link to="/jobs" className={styles.btnSecondary}>← Back to Jobs</Link>
+      <p className={styles.notFoundText}>Bid not found.</p>
+      <Link to="/jobs" className={styles.btnSecondary}>← Back to Bids</Link>
     </div>
   )
 
@@ -211,7 +211,7 @@ export default function JobDetailPage() {
     <div className={styles.page}>
       {/* Breadcrumb */}
       <div className={styles.breadcrumb}>
-        <Link to="/jobs" className={styles.breadcrumbLink}>Jobs</Link>
+        <Link to="/jobs" className={styles.breadcrumbLink}>Bids</Link>
         <span className={styles.breadcrumbSep}>/</span>
         <span className={styles.breadcrumbCurrent}>{job_.id.slice(0, 8).toUpperCase()}</span>
       </div>
@@ -222,7 +222,7 @@ export default function JobDetailPage() {
           <div className={styles.headerMeta}>
             {job_.name && <h2 className={styles.jobName}>{job_.name}</h2>}
             <div className={styles.headerTitleRow}>
-              <h1 className={styles.jobTitle}>Job {job_.id.slice(0, 8).toUpperCase()}</h1>
+              <h1 className={styles.jobTitle}>Bid {job_.id.slice(0, 8).toUpperCase()}</h1>
               <JobBadge status={job_.status} />
             </div>
             <p className={styles.jobDate}>Submitted {fmtDate(job_.created_at)}</p>

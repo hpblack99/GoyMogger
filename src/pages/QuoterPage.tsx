@@ -276,7 +276,7 @@ export default function QuoterPage() {
       setStep('waiting')
     } catch (err: unknown) {
       const msg = (err as { message?: string })?.message ?? String(err)
-      setSubmitError(msg || 'Failed to submit job')
+      setSubmitError(msg || 'Failed to submit bid')
     }
   }
 
@@ -369,7 +369,7 @@ export default function QuoterPage() {
       <div className={styles.header}>
         <h1 className={styles.title}>FFE Reefer LTL Quote Bot</h1>
         <p className={styles.subtitle}>
-          Upload a spreadsheet → job lands in Supabase → Python worker quotes each row → results appear live.
+          Upload a spreadsheet → bid lands in Supabase → Python worker quotes each row → results appear live.
         </p>
         <StepIndicator current={step} />
       </div>

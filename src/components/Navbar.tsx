@@ -20,10 +20,10 @@ export default function Navbar() {
             Dashboard
           </Link>
           <Link to="/jobs" className={`${styles.link} ${active('/jobs')}`}>
-            Jobs
+            Bids
           </Link>
           <Link to="/quoter" className={`${styles.link} ${styles.linkCta} ${active('/quoter')}`}>
-            + New Job
+            + New Bid
           </Link>
         </div>
       </nav>
