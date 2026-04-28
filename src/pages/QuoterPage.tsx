@@ -77,6 +77,26 @@ function padZip(z: string): string {
   return /^\d+$/.test(t) ? t.padStart(5, '0') : t
 }
 
+function parseCost(rateStr: string | null | undefined): number | null {
+  if (!rateStr) return null
+  const n = parseFloat(rateStr.replace(/[$,]/g, ''))
+  return isNaN(n) ? null : n
+}
+
+function calcPricing(rateStr: string | null | undefined, marginPct: number, minProfit: number, maxProfit: number) {
+  const cost = parseCost(rateStr)
+  if (cost === null || cost <= 0 || marginPct < 0 || marginPct >= 100) return null
+  let sellPrice = cost / (1 - marginPct / 100)
+  let gp = sellPrice - cost
+  if (minProfit > 0 && gp < minProfit) { gp = minProfit; sellPrice = cost + minProfit }
+  if (maxProfit > 0 && gp > maxProfit) { gp = maxProfit; sellPrice = cost + maxProfit }
+  return { cost, sellPrice, gp }
+}
+
+function fmtMoney(n: number) {
+  return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 function parseXlsx(file: File): Promise<ShipmentRow[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -122,24 +142,31 @@ function parseXlsx(file: File): Promise<ShipmentRow[]> {
   })
 }
 
-function downloadResults(rows: QuoteRow[]) {
-  const data = rows.map((r) => ({
-    '#':            r.row_index,
-    'Origin ZIP':   r.origin_zip,
-    'Dest ZIP':     r.dest_zip,
-    'Weight (lbs)': r.weight,
-    'Class':        r.freight_class,
-    'Rate':         r.rate ?? '',
-    'Transit Days': r.transit_days ?? '',
-    'Quote #':      r.quote_number ?? '',
-    'Status':       r.status,
-    'Notes':        r.error ?? '',
-  }))
+function downloadResults(rows: QuoteRow[], companyName: string, marginPct: number, minProfit: number, maxProfit: number) {
+  const data = rows.map((r) => {
+    const p = calcPricing(r.rate, marginPct, minProfit, maxProfit)
+    return {
+      '#':            r.row_index,
+      'Origin ZIP':   r.origin_zip,
+      'Dest ZIP':     r.dest_zip,
+      'Weight (lbs)': r.weight,
+      'Class':        r.freight_class,
+      'FFE Cost':     r.rate ?? '',
+      'Sell Price':   p ? fmtMoney(p.sellPrice) : '',
+      'GP ($)':       p ? fmtMoney(p.gp) : '',
+      'Margin %':     p ? ((p.gp / p.sellPrice) * 100).toFixed(1) + '%' : '',
+      'Transit Days': r.transit_days ?? '',
+      'Quote #':      r.quote_number ?? '',
+      'Status':       r.status,
+      'Notes':        r.error ?? '',
+    }
+  })
   const ws = XLSX.utils.json_to_sheet(data)
-  ws['!cols'] = [4, 12, 12, 14, 24, 12, 14, 14, 10, 30].map((w) => ({ wch: w }))
+  ws['!cols'] = [4, 12, 12, 14, 10, 14, 14, 12, 12, 14, 14, 10, 30].map((w) => ({ wch: w }))
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'FFE Quotes')
-  XLSX.writeFile(wb, `ffe-quotes-${new Date().toISOString().split('T')[0]}.xlsx`)
+  const safe = (companyName.trim() || 'FFE').replace(/[/\\?%*:|"<>]/g, '-')
+  XLSX.writeFile(wb, `${safe} Reefer Quotes.xlsx`)
 }
 
 function StatusBadge({ status }: { status: QuoteRow['status'] }) {
@@ -166,6 +193,9 @@ export default function QuoterPage() {
   const [uploading, setUploading]     = useState(false)
   const [freightClass, setFreightClass] = useState('')
   const [quoteName, setQuoteName]       = useState('')
+  const [marginPct,  setMarginPct]      = useState(15)
+  const [minProfit,  setMinProfit]      = useState(75)
+  const [maxProfit,  setMaxProfit]      = useState(500)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const channelRef   = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
@@ -499,7 +529,12 @@ export default function QuoterPage() {
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>Quoting in Progress…</h2>
           <ProgressBar pct={pct} done={job.done_rows} total={job.total_rows} completed={completed} processing={quoteRows.filter((r) => r.status === 'processing').length} errors={errors} />
-          <ResultsTable rows={quoteRows} />
+          <PricingControls
+            marginPct={marginPct} minProfit={minProfit} maxProfit={maxProfit}
+            onMarginPct={setMarginPct} onMinProfit={setMinProfit} onMaxProfit={setMaxProfit}
+            rows={quoteRows}
+          />
+          <ResultsTable rows={quoteRows} marginPct={marginPct} minProfit={minProfit} maxProfit={maxProfit} />
         </div>
       )}
 
@@ -519,10 +554,15 @@ export default function QuoterPage() {
                   {errors > 0 && <div className={`${styles.summaryChip} ${styles.summaryChipError}`}><span className={styles.summaryNum}>{errors}</span> Errors</div>}
                 </div>
               </>}
-          <ResultsTable rows={quoteRows} />
+          <PricingControls
+            marginPct={marginPct} minProfit={minProfit} maxProfit={maxProfit}
+            onMarginPct={setMarginPct} onMinProfit={setMinProfit} onMaxProfit={setMaxProfit}
+            rows={quoteRows}
+          />
+          <ResultsTable rows={quoteRows} marginPct={marginPct} minProfit={minProfit} maxProfit={maxProfit} />
           <div className={styles.actions}>
             {quoteRows.length > 0 && (
-              <button className={styles.btnPrimary} onClick={() => downloadResults(quoteRows)}>
+              <button className={styles.btnPrimary} onClick={() => downloadResults(quoteRows, quoteName, marginPct, minProfit, maxProfit)}>
                 Download Results (.xlsx)
               </button>
             )}
@@ -602,15 +642,86 @@ function ShipmentPreviewTable({ rows }: { rows: ShipmentRow[] }) {
   )
 }
 
-function ResultsTable({ rows }: { rows: QuoteRow[] }) {
+function PricingControls({
+  marginPct, minProfit, maxProfit, onMarginPct, onMinProfit, onMaxProfit, rows,
+}: {
+  marginPct: number; minProfit: number; maxProfit: number
+  onMarginPct: (v: number) => void; onMinProfit: (v: number) => void; onMaxProfit: (v: number) => void
+  rows: QuoteRow[]
+}) {
+  const totals = rows.reduce(
+    (acc, r) => {
+      const p = calcPricing(r.rate, marginPct, minProfit, maxProfit)
+      if (!p) return acc
+      return { cost: acc.cost + p.cost, sell: acc.sell + p.sellPrice, gp: acc.gp + p.gp, count: acc.count + 1 }
+    },
+    { cost: 0, sell: 0, gp: 0, count: 0 }
+  )
+  return (
+    <div className={styles.pricingPanel}>
+      <div className={styles.pricingHeader}>Pricing Controls</div>
+      <div className={styles.pricingInputRow}>
+        <div className={styles.pricingField}>
+          <label className={styles.pricingLabel}>Margin %</label>
+          <input className={styles.pricingInput} type="number" min={0} max={99} step={0.5}
+            value={marginPct} onChange={(e) => onMarginPct(parseFloat(e.target.value) || 0)} />
+        </div>
+        <div className={styles.pricingField}>
+          <label className={styles.pricingLabel}>Min Profit ($)</label>
+          <input className={styles.pricingInput} type="number" min={0} step={1}
+            value={minProfit} onChange={(e) => onMinProfit(parseFloat(e.target.value) || 0)} />
+        </div>
+        <div className={styles.pricingField}>
+          <label className={styles.pricingLabel}>Max Profit ($)</label>
+          <input className={styles.pricingInput} type="number" min={0} step={1}
+            value={maxProfit} onChange={(e) => onMaxProfit(parseFloat(e.target.value) || 0)} />
+        </div>
+      </div>
+      {totals.count > 0 && (
+        <div className={styles.gpSummaryBar}>
+          <div className={styles.gpStat}>
+            <span className={styles.gpStatNum}>{totals.count}</span>
+            <span className={styles.gpStatLbl}>Lanes Quoted</span>
+          </div>
+          <div className={styles.gpDivider} />
+          <div className={styles.gpStat}>
+            <span className={styles.gpStatNum}>{fmtMoney(totals.cost)}</span>
+            <span className={styles.gpStatLbl}>Total FFE Cost</span>
+          </div>
+          <div className={styles.gpDivider} />
+          <div className={styles.gpStat}>
+            <span className={styles.gpStatNum}>{fmtMoney(totals.sell)}</span>
+            <span className={styles.gpStatLbl}>Total Sell Price</span>
+          </div>
+          <div className={styles.gpDivider} />
+          <div className={`${styles.gpStat} ${styles.gpStatHighlight}`}>
+            <span className={styles.gpStatNum}>{fmtMoney(totals.gp)}</span>
+            <span className={styles.gpStatLbl}>Total GP</span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ResultsTable({ rows, marginPct, minProfit, maxProfit }: { rows: QuoteRow[]; marginPct: number; minProfit: number; maxProfit: number }) {
+  const priced = rows.map((r) => ({ r, p: calcPricing(r.rate, marginPct, minProfit, maxProfit) }))
+  const totals = priced.reduce(
+    (acc, { p }) => p ? { cost: acc.cost + p.cost, sell: acc.sell + p.sellPrice, gp: acc.gp + p.gp, count: acc.count + 1 } : acc,
+    { cost: 0, sell: 0, gp: 0, count: 0 }
+  )
   return (
     <div className={styles.tableWrapper}>
       <table className={styles.table}>
         <thead>
-          <tr><th>#</th><th>Origin</th><th>Dest</th><th>Weight</th><th>Status</th><th>Rate</th><th>Transit</th><th>Quote #</th><th>Notes</th></tr>
+          <tr>
+            <th>#</th><th>Origin</th><th>Dest</th><th>Weight</th><th>Status</th>
+            <th>FFE Cost</th><th>Sell Price</th><th>GP ($)</th>
+            <th>Transit</th><th>Quote #</th><th>Notes</th>
+          </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
+          {priced.map(({ r, p }) => (
             <tr key={r.id || r.row_index} className={r.status === 'error' ? styles.rowError : r.status === 'complete' ? styles.rowComplete : ''}>
               <td>{r.row_index}</td>
               <td>{r.origin_zip}</td>
@@ -618,12 +729,25 @@ function ResultsTable({ rows }: { rows: QuoteRow[] }) {
               <td>{r.weight}</td>
               <td><StatusBadge status={r.status} /></td>
               <td className={styles.rateCell}>{r.rate ?? '—'}</td>
+              <td className={styles.sellCell}>{p ? fmtMoney(p.sellPrice) : '—'}</td>
+              <td className={styles.gpCell}>{p ? fmtMoney(p.gp) : '—'}</td>
               <td>{r.transit_days ?? '—'}</td>
               <td>{r.quote_number ?? '—'}</td>
               <td className={styles.notesCell}>{r.error ?? ''}</td>
             </tr>
           ))}
         </tbody>
+        {totals.count > 0 && (
+          <tfoot>
+            <tr className={styles.totalsRow}>
+              <td colSpan={5} className={styles.totalsLabel}>Totals — {totals.count} lane{totals.count !== 1 ? 's' : ''}</td>
+              <td className={styles.rateCell}>{fmtMoney(totals.cost)}</td>
+              <td className={styles.sellCell}>{fmtMoney(totals.sell)}</td>
+              <td className={styles.gpCell}>{fmtMoney(totals.gp)}</td>
+              <td colSpan={3} />
+            </tr>
+          </tfoot>
+        )}
       </table>
     </div>
   )
