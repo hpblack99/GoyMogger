@@ -70,6 +70,23 @@ def _get_text(page: Page, selector: str) -> str | None:
     return None
 
 
+def _find_row_value(page: Page, row_label: str, cell_index: int = -1) -> str | None:
+    """Find a table row by label text and return value from specified cell (default: last cell)."""
+    try:
+        rows = page.query_selector_all("tr")
+        for row in rows:
+            row_text = (row.text_content() or "").lower()
+            if row_label.lower() in row_text:
+                cells = row.query_selector_all("td")
+                if cells and len(cells) > abs(cell_index):
+                    cell_text = cells[cell_index].text_content()
+                    if cell_text and cell_text.strip():
+                        return cell_text.strip()
+    except Exception:
+        pass
+    return None
+
+
 class FFEQuoter:
     def __init__(self, debug: bool = False):
         self.debug = debug
@@ -248,6 +265,13 @@ class FFEQuoter:
         res = CONFIG["results"]
         quote_number = _get_text(self.page, res["quote_number"])
         raw_rate     = _get_text(self.page, res["total_charge"])
+
+        # Fallback: if primary selector didn't work, try finding by row label
+        if not raw_rate:
+            raw_rate = _find_row_value(self.page, "Total Estimated Charges")
+        if not raw_rate:
+            raw_rate = _find_row_value(self.page, "Total Estimated Charge")
+
         transit_days = _get_text(self.page, res["transit_days"])
 
         # Normalise rate — keep the dollar amount only if we got one

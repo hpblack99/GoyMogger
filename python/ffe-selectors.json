@@ -21,7 +21,7 @@
   },
   "results": {
     "quote_number": "span#dnn_ctr2175_View_Label1",
-    "total_charge": ".table-ffe-darkgreay-row td:last-child b",
+    "total_charge": ".table-ffe-darkgreay-row td:last-child b, tr:has-text('Total Estimated Charges') td:last-child, tr:has-text('Total Estimated Charge') td:last-child",
     "transit_days": ".transit-days, [id*='Transit'], td:has-text('Transit'), .table-ffe td b"
   },
   "class_id_map": {
