@@ -207,6 +207,11 @@ class FFEQuoter:
                 self.page.wait_for_url("**/RateResult**", wait_until="load", timeout=wait_ms)
                 break  # navigation happened — done
             except Exception:
+                # Page may have navigated but "load" timed out (FFE analytics/networkidle
+                # confusion). If we're already on the result page, just continue.
+                if "RateResult" in self.page.url:
+                    print(f"  [FFE] Load timed out but already on result page — continuing")
+                    break
                 if click_num == MAX_CLICKS:
                     raise RuntimeError(
                         f"Rate Shipment button clicked {MAX_CLICKS} times "

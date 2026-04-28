@@ -283,7 +283,8 @@ export default function QuoterPage() {
 
     channelRef.current = channel
 
-    // Polling fallback — catches updates if realtime delivery lags
+    // Polling fallback — catches updates if realtime delivery lags.
+    // Also refreshes rows while running so per-row status updates in real-time.
     const poll = setInterval(async () => {
       const { data: jobData } = await supabase.from('quote_jobs').select('*').eq('id', job.id).single()
       if (!jobData) return
@@ -295,6 +296,9 @@ export default function QuoterPage() {
         clearInterval(poll)
       } else if (jobData.status === 'running') {
         setStep('running')
+        // Always re-fetch rows while running so complete/error/processing shows immediately
+        const { data: rowData } = await supabase.from('quote_rows').select('*').eq('job_id', job.id).order('row_index')
+        if (rowData) setQuoteRows(rowData as QuoteRow[])
       }
     }, 3000)
 

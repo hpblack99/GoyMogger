@@ -102,7 +102,7 @@ export default function HomePage() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Quote Name</th>
+                  <th>Company Name</th>
                   <th>Submitted</th>
                   <th>Status</th>
                   <th>Progress</th>
