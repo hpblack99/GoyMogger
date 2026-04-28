@@ -5,6 +5,7 @@ Set DEBUG=true in .env to run with a visible browser. Screenshots saved to pytho
 """
 
 import json
+import random
 import re
 import time
 from datetime import datetime
@@ -179,7 +180,9 @@ class FFEQuoter:
         origin_zip_padded = str(row["origin_zip"]).strip().zfill(5)
         dest_zip_padded = str(row["dest_zip"]).strip().zfill(5)
         self.page.fill(cfg["origin_zip"], origin_zip_padded)
+        self.page.wait_for_timeout(random.randint(200, 500))
         self.page.fill(cfg["dest_zip"],   dest_zip_padded)
+        self.page.wait_for_timeout(random.randint(200, 500))
 
         # ── Weight ───────────────────────────────────────────────────────────
         # page.fill() clears the field before typing, overwriting the default 0
@@ -187,9 +190,11 @@ class FFEQuoter:
         if not self.page.query_selector(cfg["weight"]):
             raise RuntimeError(f"Weight field '{cfg['weight']}' not found on form.")
         self.page.fill(cfg["weight"], weight_str)
+        self.page.wait_for_timeout(random.randint(200, 500))
 
         # ── Freight class / commodity → FFE select option ────────────────────
         _select_class_option(self.page, cfg["freight_class"], str(row["freight_class"]))
+        self.page.wait_for_timeout(random.randint(300, 700))
 
         _screenshot(self.page, f"05-form-filled-row{row['row_index']}")
 
@@ -198,8 +203,16 @@ class FFEQuoter:
         # MAX_CLICKS times; after each click we verify whether the page navigated
         # to the result. Short timeout per attempt so we cycle fast when FFE
         # ignores the click; longer timeout on the final attempt.
+        # Before each click we hover the button and add a short human-like delay
+        # to avoid triggering FFE's bot detection.
         MAX_CLICKS = 10
         for click_num in range(1, MAX_CLICKS + 1):
+            # Hover over the button, pause like a human would, then click
+            try:
+                self.page.hover(cfg["submit"])
+                self.page.wait_for_timeout(random.randint(300, 800))
+            except Exception:
+                pass  # hover failure is non-fatal — proceed with click
             self.page.click(cfg["submit"], no_wait_after=True)
             print(f"  [FFE] Submit click {click_num}/{MAX_CLICKS}")
             wait_ms = 60_000 if click_num == MAX_CLICKS else 5_000
