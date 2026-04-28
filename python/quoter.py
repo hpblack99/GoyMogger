@@ -192,20 +192,16 @@ class FFEQuoter:
         _screenshot(self.page, f"05-form-filled-row{row['row_index']}")
 
         # ── Submit ────────────────────────────────────────────────────────────
-        # First click triggers FFE's client-side validation JS.
-        # no_wait_after=True prevents Playwright from hanging waiting for a
-        # navigation that may or may not start after this first click.
+        # Both clicks use no_wait_after=True so Playwright doesn't hang on its
+        # built-in post-click navigation wait (which defaults to networkidle).
+        # Navigation is managed explicitly via wait_for_url below.
         self.page.click(cfg["submit"], no_wait_after=True)
         self.page.wait_for_timeout(800)
+        self.page.click(cfg["submit"], no_wait_after=True)
 
-        # Second click submits. Use "load" not "networkidle" — FFE's result
-        # page fires analytics/tracking requests that prevent networkidle
-        # from ever being reached within a reasonable timeout.
-        with self.page.expect_navigation(wait_until="load", timeout=60_000):
-            self.page.click(cfg["submit"])
-
-        # Wait until we're actually on the result page before scraping
-        self.page.wait_for_url("**/RateResult**", timeout=30_000)
+        # Wait for the result page — "load" fires once DOM is ready, avoids
+        # the networkidle trap caused by FFE's analytics/tracking requests.
+        self.page.wait_for_url("**/RateResult**", wait_until="load", timeout=60_000)
 
         _screenshot(self.page, f"06-results-row{row['row_index']}")
 
