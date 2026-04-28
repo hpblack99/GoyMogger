@@ -202,15 +202,29 @@ export default function QuoterPage() {
       return
     }
     try {
-      const { data: jobData, error: jobErr } = await supabase
+      // Try with name first; fall back without it if the column doesn't exist yet
+      const jobPayload: Record<string, unknown> = {
+        total_rows: parsedRows.length,
+        status: 'pending',
+        name: quoteName.trim() || null,
+      }
+      let { data: jobData, error: jobErr } = await supabase
         .from('quote_jobs')
-        .insert({ total_rows: parsedRows.length, status: 'pending', name: quoteName.trim() || null })
+        .insert(jobPayload)
         .select()
         .single()
+
+      if (jobErr?.message?.includes('name')) {
+        // Migration not yet applied — retry without the name column
+        delete jobPayload.name
+        const retry = await supabase.from('quote_jobs').insert(jobPayload).select().single()
+        jobData = retry.data
+        jobErr  = retry.error
+      }
       if (jobErr) throw jobErr
 
       const rowInserts = parsedRows.map((r, i) => ({
-        job_id:        jobData.id,
+        job_id:        jobData!.id,
         row_index:     i + 1,
         origin_zip:    r.origin_zip,
         dest_zip:      r.dest_zip,
@@ -225,8 +239,9 @@ export default function QuoterPage() {
       setJob(jobData as QuoteJob)
       setQuoteRows(rowInserts.map((r) => ({ ...r, id: '', status: 'pending' as const })))
       setStep('waiting')
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Failed to submit job')
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message ?? String(err)
+      setSubmitError(msg || 'Failed to submit job')
     }
   }
 
