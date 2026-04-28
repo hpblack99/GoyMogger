@@ -195,20 +195,40 @@ class FFEQuoter:
 
         # ── Submit ────────────────────────────────────────────────────────────
         # FFE may ignore clicks as an anti-automation measure. We click up to
-        # MAX_CLICKS times; after each click we wait briefly for the page to
-        # navigate to the result. Short timeout per attempt so we move on fast
-        # if the click was ignored; full timeout on the last attempt.
+        # MAX_CLICKS times, verifying after each whether the page navigated.
+        # Guards:
+        #   1. Check URL before each click — a previous click may have already
+        #      landed us on RateResult while wait_for_url was timing out.
+        #   2. Give page.click() a short timeout so it fails fast if the submit
+        #      button is missing (e.g. we're already on the results page).
         MAX_CLICKS = 6
         for click_num in range(1, MAX_CLICKS + 1):
-            self.page.click(cfg["submit"], no_wait_after=True)
+            # Guard: if we're already on the result page, stop clicking.
+            if "RateResult" in self.page.url:
+                print(f"  [FFE] Already on result page before click {click_num} — done")
+                break
+
+            try:
+                self.page.click(cfg["submit"], no_wait_after=True, timeout=8_000)
+            except Exception:
+                # Button not found or not clickable — check if we landed on results anyway.
+                if "RateResult" in self.page.url:
+                    print(f"  [FFE] Click failed but already on result page — continuing")
+                    break
+                if click_num == MAX_CLICKS:
+                    raise RuntimeError(
+                        f"Submit button not clickable after {MAX_CLICKS} attempts."
+                    )
+                self.page.wait_for_timeout(1_500)
+                continue
+
             print(f"  [FFE] Submit click {click_num}/{MAX_CLICKS}")
             wait_ms = 60_000 if click_num == MAX_CLICKS else 6_000
             try:
                 self.page.wait_for_url("**/RateResult**", wait_until="load", timeout=wait_ms)
-                break  # navigation happened — done
+                break  # navigation confirmed — done
             except Exception:
-                # Page may have navigated but "load" timed out (FFE analytics keeping
-                # network busy). Check URL directly before giving up on this attempt.
+                # Load timed out — check URL directly before retrying.
                 if "RateResult" in self.page.url:
                     print(f"  [FFE] Load timed out but already on result page — continuing")
                     break
