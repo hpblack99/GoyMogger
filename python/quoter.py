@@ -195,20 +195,21 @@ class FFEQuoter:
 
         # ── Submit ────────────────────────────────────────────────────────────
         # FFE may ignore clicks as an anti-automation measure. We click up to
-        # MAX_CLICKS times; after each click we wait briefly for the page to
-        # navigate to the result. Short timeout per attempt so we move on fast
-        # if the click was ignored; full timeout on the last attempt.
-        MAX_CLICKS = 6
+        # MAX_CLICKS times; after each click we verify whether the page navigated
+        # to the result. Short timeout per attempt so we cycle fast when FFE
+        # ignores the click; longer timeout on the final attempt.
+        MAX_CLICKS = 10
         for click_num in range(1, MAX_CLICKS + 1):
             self.page.click(cfg["submit"], no_wait_after=True)
             print(f"  [FFE] Submit click {click_num}/{MAX_CLICKS}")
-            wait_ms = 60_000 if click_num == MAX_CLICKS else 6_000
+            wait_ms = 60_000 if click_num == MAX_CLICKS else 5_000
             try:
                 self.page.wait_for_url("**/RateResult**", wait_until="load", timeout=wait_ms)
-                break  # navigation happened — done
+                print(f"  [FFE] Navigated to result on click {click_num}")
+                break  # navigation confirmed — done
             except Exception:
-                # Page may have navigated but "load" timed out (FFE analytics/networkidle
-                # confusion). If we're already on the result page, just continue.
+                # Page may have navigated but "load" timed out (FFE analytics keeping
+                # network busy). Check URL directly before giving up on this attempt.
                 if "RateResult" in self.page.url:
                     print(f"  [FFE] Load timed out but already on result page — continuing")
                     break
@@ -217,6 +218,7 @@ class FFEQuoter:
                         f"Rate Shipment button clicked {MAX_CLICKS} times "
                         "but page never navigated to result."
                     )
+                print(f"  [FFE] Click {click_num} had no effect — retrying in 1.5s…")
                 self.page.wait_for_timeout(1_500)  # brief pause before next click
 
         _screenshot(self.page, f"06-results-row{row['row_index']}")
