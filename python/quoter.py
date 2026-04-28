@@ -176,8 +176,8 @@ class FFEQuoter:
         cfg = CONFIG["quote_form"]
 
         # ── Origin / destination ──────────────────────────────────────────────
-        self.page.fill(cfg["origin_zip"], _normalize_zip(str(row["origin_zip"])))
-        self.page.fill(cfg["dest_zip"],   _normalize_zip(str(row["dest_zip"])))
+        self.page.fill(cfg["origin_zip"], str(row["origin_zip"]).strip())
+        self.page.fill(cfg["dest_zip"],   str(row["dest_zip"]).strip())
 
         # ── Weight ───────────────────────────────────────────────────────────
         # page.fill() clears the field before typing, overwriting the default 0
@@ -310,12 +310,6 @@ def _select_class_option(page: Page, selector: str, value: str) -> None:
     # 3. Internal ID map fallback
     class_id = _resolve_class_id(value)
     page.select_option(selector, value=class_id)
-
-
-def _normalize_zip(z: str) -> str:
-    """Pad 4-digit zips with a leading zero (Excel strips them from numeric cells)."""
-    z = str(z).strip()
-    return z.zfill(5) if z.isdigit() and len(z) == 4 else z
 
 
 def _parse_dollar(text: str | None) -> str | None:
