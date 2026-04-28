@@ -72,6 +72,11 @@ const COL_PATTERNS: Record<string, RegExp> = {
   weight:     /(?:gross\s+|total\s+)?weight|^wt$/i,
 }
 
+function normalizeZip(z: string): string {
+  const t = z.trim()
+  return t.length === 4 && /^\d+$/.test(t) ? '0' + t : t
+}
+
 function parseXlsx(file: File): Promise<ShipmentRow[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -102,8 +107,8 @@ function parseXlsx(file: File): Promise<ShipmentRow[]> {
           .slice(1)
           .filter((r) => Array.isArray(r) && r.length && r[colIdx.origin_zip!])
           .map((r) => ({
-            origin_zip: String(r[colIdx.origin_zip!] ?? '').trim(),
-            dest_zip:   String(r[colIdx.dest_zip!]   ?? '').trim(),
+            origin_zip: normalizeZip(String(r[colIdx.origin_zip!] ?? '')),
+            dest_zip:   normalizeZip(String(r[colIdx.dest_zip!]   ?? '')),
             weight:     Number(r[colIdx.weight!]      ?? 0),
           }))
 
