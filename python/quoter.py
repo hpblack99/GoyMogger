@@ -192,16 +192,25 @@ class FFEQuoter:
         _screenshot(self.page, f"05-form-filled-row{row['row_index']}")
 
         # ── Submit ────────────────────────────────────────────────────────────
-        # Both clicks use no_wait_after=True so Playwright doesn't hang on its
-        # built-in post-click navigation wait (which defaults to networkidle).
-        # Navigation is managed explicitly via wait_for_url below.
-        self.page.click(cfg["submit"], no_wait_after=True)
-        self.page.wait_for_timeout(800)
-        self.page.click(cfg["submit"], no_wait_after=True)
-
-        # Wait for the result page — "load" fires once DOM is ready, avoids
-        # the networkidle trap caused by FFE's analytics/tracking requests.
-        self.page.wait_for_url("**/RateResult**", wait_until="load", timeout=60_000)
+        # FFE may ignore clicks as an anti-automation measure. We click up to
+        # MAX_CLICKS times; after each click we wait briefly for the page to
+        # navigate to the result. Short timeout per attempt so we move on fast
+        # if the click was ignored; full timeout on the last attempt.
+        MAX_CLICKS = 6
+        for click_num in range(1, MAX_CLICKS + 1):
+            self.page.click(cfg["submit"], no_wait_after=True)
+            print(f"  [FFE] Submit click {click_num}/{MAX_CLICKS}")
+            wait_ms = 60_000 if click_num == MAX_CLICKS else 6_000
+            try:
+                self.page.wait_for_url("**/RateResult**", wait_until="load", timeout=wait_ms)
+                break  # navigation happened — done
+            except Exception:
+                if click_num == MAX_CLICKS:
+                    raise RuntimeError(
+                        f"Rate Shipment button clicked {MAX_CLICKS} times "
+                        "but page never navigated to result."
+                    )
+                self.page.wait_for_timeout(1_500)  # brief pause before next click
 
         _screenshot(self.page, f"06-results-row{row['row_index']}")
 
