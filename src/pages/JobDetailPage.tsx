@@ -141,7 +141,7 @@ export default function JobDetailPage() {
   useEffect(() => {
     if (!id) return
 
-    // Load job + rows
+    // Initial load
     Promise.all([
       supabase.from('quote_jobs').select('*').eq('id', id).single(),
       supabase.from('quote_rows').select('*').eq('job_id', id).order('row_index'),
@@ -152,26 +152,43 @@ export default function JobDetailPage() {
       setLoading(false)
     })
 
-    // Real-time subscriptions
+    // Real-time subscriptions — immediate updates via Supabase websocket
     const channel = supabase
       .channel(`job-detail-${id}`)
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'quote_jobs', filter: `id=eq.${id}` },
-        (payload) => setJob(payload.new as QuoteJob)
+        { event: '*', schema: 'public', table: 'quote_jobs', filter: `id=eq.${id}` },
+        (payload) => {
+          if (payload.eventType !== 'DELETE') setJob(payload.new as QuoteJob)
+        }
       )
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'quote_rows', filter: `job_id=eq.${id}` },
+        { event: '*', schema: 'public', table: 'quote_rows', filter: `job_id=eq.${id}` },
         (payload) => {
-          const updated = payload.new as QuoteRow
-          setRows((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
+          if (payload.eventType === 'UPDATE') {
+            setRows((prev) => prev.map((r) => (r.id === (payload.new as QuoteRow).id ? payload.new as QuoteRow : r)))
+          } else if (payload.eventType === 'INSERT') {
+            const row = payload.new as QuoteRow
+            setRows((prev) => prev.some((r) => r.id === row.id) ? prev : [...prev, row].sort((a, b) => a.row_index - b.row_index))
+          }
         }
       )
       .subscribe()
 
+    // Polling fallback — catches missed realtime events; stops when job finishes
+    let pollId: ReturnType<typeof setInterval>
+    pollId = setInterval(async () => {
+      const { data: jobData } = await supabase.from('quote_jobs').select('*').eq('id', id).single()
+      if (!jobData) return
+      setJob(jobData as QuoteJob)
+      const { data: rowData } = await supabase.from('quote_rows').select('*').eq('job_id', id).order('row_index')
+      if (rowData) setRows(rowData as QuoteRow[])
+      if (jobData.status === 'complete' || jobData.status === 'error') clearInterval(pollId)
+    }, 3_000)
+
     channelRef.current = channel
-    return () => { supabase.removeChannel(channel) }
+    return () => { supabase.removeChannel(channel); clearInterval(pollId) }
   }, [id])
 
   const handleDelete = async () => {
