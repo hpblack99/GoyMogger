@@ -121,6 +121,35 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+# ─── Network error detection ──────────────────────────────────────────────────────
+
+_NETWORK_ERROR_PATTERNS = [
+    "WinError 10054",   # Windows: connection forcibly closed by remote
+    "WinError 10053",   # Windows: connection aborted by software
+    "ConnectionResetError",
+    "connection was forcibly closed",
+    "Connection reset by peer",
+    "RemoteDisconnected",
+    "BrokenPipeError",
+    "ConnectionAbortedError",
+    "errno 104",        # Linux: connection reset by peer
+]
+
+def _is_network_error(error: str) -> bool:
+    return any(p.lower() in error.lower() for p in _NETWORK_ERROR_PATTERNS)
+
+
+def requeue_job(sb: Client, job_id: str, done_rows: int) -> None:
+    """Reset non-complete rows and put the job back in the pending queue."""
+    sb.table("quote_rows").update({
+        "status": "pending", "rate": None, "transit_days": None,
+        "quote_number": None, "error": None, "updated_at": _now(),
+    }).eq("job_id", job_id).neq("status", "complete").execute()
+    sb.table("quote_jobs").update({
+        "status": "pending", "done_rows": done_rows, "error": None, "updated_at": _now(),
+    }).eq("id", job_id).execute()
+
+
 # ─── Job processor ───────────────────────────────────────────────────────────
 
 def process_job(sb: Client, job: dict) -> None:
@@ -168,7 +197,13 @@ def process_job(sb: Client, job: dict) -> None:
     except Exception as exc:
         err = str(exc)
         print(f"[Worker] Job FAILED: {err}")
-        finish_job(sb, job_id, done, error=err)
+        if _is_network_error(err):
+            print("[Worker] Network error — waiting 15s then re-queuing job for retry…")
+            time.sleep(15)
+            requeue_job(sb, job_id, done)
+            print(f"[Worker] Job re-queued. {done} row(s) already complete are preserved.")
+        else:
+            finish_job(sb, job_id, done, error=err)
 
 
 # ─── Main loop ────────────────────────────────────────────────────────────────
