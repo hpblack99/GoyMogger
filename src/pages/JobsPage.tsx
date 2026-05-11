@@ -25,7 +25,10 @@ function fmtDate(iso: string) {
   )
 }
 
-function JobBadge({ status }: { status: QuoteJob['status'] }) {
+function JobBadge({ status, paused }: { status: QuoteJob['status']; paused?: boolean }) {
+  if (paused && status === 'running') {
+    return <span className={`${styles.badge} ${styles.badgePaused}`}>Paused</span>
+  }
   const map = {
     pending:  { label: 'Pending',  cls: styles.badgePending  },
     running:  { label: 'Running',  cls: styles.badgeRunning  },
@@ -43,6 +46,12 @@ export default function JobsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [requeueingId, setRequeuingId] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(t)
+  }, [])
 
   const loadJobs = () =>
     supabase
@@ -150,6 +159,7 @@ export default function JobsPage() {
                 const isRequeueing = requeueingId === j.id
                 const canRequeue = j.status === 'complete' || j.status === 'error'
                 const canCancel  = j.status === 'pending' || j.status === 'running'
+                const isPaused   = j.status === 'running' && (now - new Date(j.updated_at).getTime()) > 90_000
 
                 return (
                   <tr key={j.id} className={isDeleting ? styles.rowFading : ''}>
@@ -164,12 +174,12 @@ export default function JobsPage() {
                       )}
                     </td>
                     <td className={styles.dateCell}>{fmtDate(j.created_at)}</td>
-                    <td><JobBadge status={j.status} /></td>
+                    <td><JobBadge status={j.status} paused={isPaused} /></td>
                     <td>
                       <div className={styles.progressWrap}>
                         <div className={styles.progressBar}>
                           <div
-                            className={`${styles.progressFill} ${j.status === 'running' ? styles.progressAnimated : ''}`}
+                            className={`${styles.progressFill} ${j.status === 'running' && !isPaused ? styles.progressAnimated : ''}`}
                             style={{ width: `${pct}%` }}
                           />
                         </div>

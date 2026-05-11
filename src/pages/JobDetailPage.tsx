@@ -41,7 +41,10 @@ function fmtDate(iso: string) {
   )
 }
 
-function JobBadge({ status }: { status: QuoteJob['status'] }) {
+function JobBadge({ status, paused }: { status: QuoteJob['status']; paused?: boolean }) {
+  if (paused && status === 'running') {
+    return <span className={`${styles.badge} ${styles.badgePaused}`}>Paused</span>
+  }
   const map = {
     pending:  { label: 'Pending',  cls: styles.badgePending  },
     running:  { label: 'Running',  cls: styles.badgeRunning  },
@@ -108,7 +111,7 @@ function downloadXlsx(job: QuoteJob, rows: QuoteRow[], marginPct: number, minPro
   ws['!cols'] = [4, 12, 12, 14, 8, 8, 20, 14, 14, 12, 12, 14, 14, 10, 30].map((w) => ({ wch: w }))
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'FFE Quotes')
-  const safe = (job.name?.trim() || 'FFE').replace(/[/\\?%*:|"<>]/g, '-')
+  const safe = (job.name?.trim() || 'FFE').replace(/[\/\\?%*:|"<>]/g, '-')
   XLSX.writeFile(wb, `${safe} Reefer Quotes.xlsx`)
 }
 
@@ -126,7 +129,14 @@ export default function JobDetailPage() {
   const [marginPct,    setMarginPct]    = useState(15)
   const [minProfit,    setMinProfit]    = useState(75)
   const [maxProfit,    setMaxProfit]    = useState(500)
+  const [now, setNow] = useState(() => Date.now())
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+
+  // Tick every 30s so the "Paused" badge updates without a page reload
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(t)
+  }, [])
 
   useEffect(() => {
     if (!id) return
@@ -181,6 +191,21 @@ export default function JobDetailPage() {
     setRequeueing(false)
   }
 
+  const handleRerunErrors = async () => {
+    if (!job) return
+    const errorIds  = rows.filter((r) => r.status === 'error').map((r) => r.id)
+    const doneCount = rows.filter((r) => r.status === 'complete').length
+    if (!errorIds.length) return
+    await Promise.all([
+      supabase.from('quote_rows')
+        .update({ status: 'pending', rate: null, transit_days: null, quote_number: null, error: null })
+        .in('id', errorIds),
+      supabase.from('quote_jobs')
+        .update({ status: 'pending', done_rows: doneCount, error: null })
+        .eq('id', job.id),
+    ])
+  }
+
   if (loading) return (
     <div className={styles.centered}><span className={styles.spinner} /></div>
   )
@@ -196,6 +221,8 @@ export default function JobDetailPage() {
   const pct = job_.total_rows > 0 ? Math.round((job_.done_rows / job_.total_rows) * 100) : 0
   const completedCount = rows.filter((r) => r.status === 'complete').length
   const errorCount     = rows.filter((r) => r.status === 'error').length
+  // A "running" job is considered paused if it hasn't been updated in > 90s
+  const isPaused = job_.status === 'running' && (now - new Date(job_.updated_at).getTime()) > 90_000
 
   const filteredRows = statusFilter === 'all' ? rows : rows.filter((r) => r.status === statusFilter)
 
@@ -223,16 +250,21 @@ export default function JobDetailPage() {
             {job_.name && <h2 className={styles.jobName}>{job_.name}</h2>}
             <div className={styles.headerTitleRow}>
               <h1 className={styles.jobTitle}>Bid {job_.id.slice(0, 8).toUpperCase()}</h1>
-              <JobBadge status={job_.status} />
+              <JobBadge status={job_.status} paused={isPaused} />
             </div>
             <p className={styles.jobDate}>Submitted {fmtDate(job_.created_at)}</p>
             {job_.error && <p className={styles.jobError}>{job_.error}</p>}
           </div>
 
           <div className={styles.headerActions}>
+            {errorCount > 0 && (isPaused || job_.status === 'complete' || job_.status === 'error') && (
+              <button className={styles.btnSecondary} onClick={handleRerunErrors}>
+                ↺ Re-run {errorCount} Error{errorCount !== 1 ? 's' : ''}
+              </button>
+            )}
             {(job_.status === 'complete' || job_.status === 'error') && (
               <button className={styles.btnSecondary} onClick={handleRequeue} disabled={requeueing}>
-                {requeueing ? 'Re-queuing…' : '↺ Re-queue'}
+                {requeueing ? 'Re-queuing…' : '↺ Re-queue All'}
               </button>
             )}
             {rows.length > 0 && (
@@ -278,7 +310,7 @@ export default function JobDetailPage() {
           <div className={styles.progressSection}>
             <div className={styles.progressBar}>
               <div
-                className={`${styles.progressFill} ${job_.status === 'running' ? styles.progressAnimated : ''}`}
+                className={`${styles.progressFill} ${job_.status === 'running' && !isPaused ? styles.progressAnimated : ''}`}
                 style={{ width: `${pct}%` }}
               />
             </div>
@@ -287,10 +319,10 @@ export default function JobDetailPage() {
         )}
       </div>
 
-      {/* Worker hint if pending */}
-      {job_.status === 'pending' && (
+      {/* Worker hint if pending or paused */}
+      {(job_.status === 'pending' || isPaused) && (
         <div className={styles.workerHint}>
-          <strong>Waiting for Python worker.</strong> Run <code>cd python && python worker.py</code> to start processing.
+          <strong>{isPaused ? 'Worker stopped.' : 'Waiting for Python worker.'}</strong> Run <code>cd python && python worker.py</code> to {isPaused ? 'resume' : 'start'} processing.
         </div>
       )}
 
