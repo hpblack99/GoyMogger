@@ -184,26 +184,46 @@ export default function JobDetailPage() {
   const handleRequeue = async () => {
     if (!job) return
     setRequeueing(true)
+    // Complete jobs: full reset so every lane re-runs from scratch.
+    // Error/paused jobs: smart reset — preserve complete rows, only retry the rest.
+    const isFullReset = job.status === 'complete'
+    const doneCount   = isFullReset ? 0 : rows.filter((r) => r.status === 'complete').length
+    const rowsQuery   = supabase.from('quote_rows')
+      .update({ status: 'pending', rate: null, transit_days: null, quote_number: null, error: null })
+      .eq('job_id', job.id)
     await Promise.all([
-      supabase.from('quote_jobs').update({ status: 'pending', done_rows: 0, error: null }).eq('id', job.id),
-      supabase.from('quote_rows').update({ status: 'pending', rate: null, transit_days: null, quote_number: null, error: null }).eq('job_id', job.id),
+      supabase.from('quote_jobs').update({ status: 'pending', done_rows: doneCount, error: null }).eq('id', job.id),
+      isFullReset ? rowsQuery : rowsQuery.neq('status', 'complete'),
     ])
+    setRows((prev) => prev.map((r) =>
+      isFullReset || r.status !== 'complete'
+        ? { ...r, status: 'pending' as const, rate: undefined, transit_days: undefined, quote_number: undefined, error: undefined }
+        : r
+    ))
+    setJob((j) => j ? { ...j, status: 'pending', done_rows: doneCount } : j)
     setRequeueing(false)
   }
 
   const handleRerunErrors = async () => {
     if (!job) return
-    const errorIds  = rows.filter((r) => r.status === 'error').map((r) => r.id)
+    // Reset error rows + any rows stuck in processing from a prior crash
+    const resetIds  = rows.filter((r) => r.status === 'error' || r.status === 'processing').map((r) => r.id)
     const doneCount = rows.filter((r) => r.status === 'complete').length
-    if (!errorIds.length) return
+    if (!resetIds.length) return
     await Promise.all([
       supabase.from('quote_rows')
         .update({ status: 'pending', rate: null, transit_days: null, quote_number: null, error: null })
-        .in('id', errorIds),
+        .in('id', resetIds),
       supabase.from('quote_jobs')
         .update({ status: 'pending', done_rows: doneCount, error: null })
         .eq('id', job.id),
     ])
+    setRows((prev) => prev.map((r) =>
+      r.status === 'error' || r.status === 'processing'
+        ? { ...r, status: 'pending' as const, rate: undefined, transit_days: undefined, quote_number: undefined, error: undefined }
+        : r
+    ))
+    setJob((j) => j ? { ...j, status: 'pending', done_rows: doneCount } : j)
   }
 
   if (loading) return (

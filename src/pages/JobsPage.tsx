@@ -89,11 +89,24 @@ export default function JobsPage() {
 
   const handleRequeue = async (job: QuoteJob) => {
     setRequeuingId(job.id)
-    // Reset job and all its rows back to pending
-    await Promise.all([
-      supabase.from('quote_jobs').update({ status: 'pending', done_rows: 0, error: null }).eq('id', job.id),
-      supabase.from('quote_rows').update({ status: 'pending', rate: null, transit_days: null, quote_number: null, error: null }).eq('job_id', job.id),
-    ])
+    if (job.status === 'complete') {
+      // Full reset — user wants every lane re-quoted from scratch
+      await Promise.all([
+        supabase.from('quote_jobs').update({ status: 'pending', done_rows: 0, error: null }).eq('id', job.id),
+        supabase.from('quote_rows').update({ status: 'pending', rate: null, transit_days: null, quote_number: null, error: null }).eq('job_id', job.id),
+      ])
+    } else {
+      // Smart reset — preserve complete rows so already-quoted lanes aren't re-run
+      const { count } = await supabase.from('quote_rows').select('*', { count: 'exact', head: true }).eq('job_id', job.id).eq('status', 'complete')
+      const doneCount = count ?? 0
+      await Promise.all([
+        supabase.from('quote_jobs').update({ status: 'pending', done_rows: doneCount, error: null }).eq('id', job.id),
+        supabase.from('quote_rows')
+          .update({ status: 'pending', rate: null, transit_days: null, quote_number: null, error: null })
+          .eq('job_id', job.id)
+          .neq('status', 'complete'),
+      ])
+    }
     setRequeuingId(null)
   }
 

@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
 import styles from './QuoterPage.module.css'
 
-// ── FFE #Item1_ClassId options — exact labels from live DOM ───────────────────
+// ── FFE #Item1_ClassId options — exact labels from live DOM ─────────────────────
 const COMMODITY_OPTIONS = [
   'Animal Food - Not for Human Consumption',
   'Bakery Goods Less Than 12 Pounds Per Cubic Foot',
@@ -32,7 +32,7 @@ const CLASS_OPTIONS = [
   '110', '125', '150', '175', '200', '250', '300', '400', '500',
 ]
 
-// ── Types ──────────────────────────────────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────────────────
 interface ShipmentRow {
   origin_zip: string
   dest_zip:   string
@@ -165,7 +165,7 @@ function downloadResults(rows: QuoteRow[], companyName: string, marginPct: numbe
   ws['!cols'] = [4, 12, 12, 14, 10, 14, 14, 12, 12, 14, 14, 10, 30].map((w) => ({ wch: w }))
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'FFE Quotes')
-  const safe = (companyName.trim() || 'FFE').replace(/[/\\?%*:|"<>]/g, '-')
+  const safe = (companyName.trim() || 'FFE').replace(/[\/\\?%*:|"<>]/g, '-')
   XLSX.writeFile(wb, `${safe} Reefer Quotes.xlsx`)
 }
 
@@ -180,7 +180,7 @@ function StatusBadge({ status }: { status: QuoteRow['status'] }) {
   return <span className={`${styles.badge} ${cls}`}>{label}</span>
 }
 
-// ── Main component ─────────────────────────────────────────────────────────────
+// ── Main component ──────────────────────────────────────────────────────────────────────
 export default function QuoterPage() {
   const [step, setStep]               = useState<Step>('upload')
   const [parsedRows, setParsedRows]   = useState<ShipmentRow[]>([])
@@ -199,7 +199,7 @@ export default function QuoterPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const channelRef   = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
-  // ── Handle file drop/select ──────────────────────────────────────────────────
+  // ── Handle file drop/select ───────────────────────────────────────────────────
   const handleFile = useCallback(async (file: File) => {
     setUploadError(null)
     setUploading(true)
@@ -229,7 +229,7 @@ export default function QuoterPage() {
     if (f) handleFile(f)
   }
 
-  // ── Submit job to Supabase ───────────────────────────────────────────────────
+  // ── Submit job to Supabase ───────────────────────────────────────────────
   const submitJob = async () => {
     setSubmitError(null)
     if (!freightClass) {
@@ -280,7 +280,7 @@ export default function QuoterPage() {
     }
   }
 
-  // ── Real-time subscription + polling fallback ────────────────────────────────
+  // ── Real-time subscription + polling fallback ────────────────────────────────────────
   useEffect(() => {
     if (!job?.id || step === 'upload' || step === 'preview' || step === 'done') return
 
@@ -343,7 +343,32 @@ export default function QuoterPage() {
     }
   }, [job?.id, step === 'upload' || step === 'preview']) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Reset ────────────────────────────────────────────────────────────────────
+  // ── Re-run error lanes ───────────────────────────────────────────────────────────
+  const rerunErrors = async () => {
+    if (!job) return
+    // Reset error rows + any stuck-processing rows from a prior crash
+    const resetIds  = quoteRows.filter((r) => r.status === 'error' || r.status === 'processing').map((r) => r.id)
+    const doneCount = quoteRows.filter((r) => r.status === 'complete').length
+    if (!resetIds.length) return
+    await Promise.all([
+      supabase.from('quote_rows')
+        .update({ status: 'pending', rate: null, transit_days: null, quote_number: null, error: null })
+        .in('id', resetIds),
+      supabase.from('quote_jobs')
+        .update({ status: 'pending', done_rows: doneCount, error: null })
+        .eq('id', job.id),
+    ])
+    setQuoteRows((prev) =>
+      prev.map((r) => (r.status === 'error' || r.status === 'processing')
+        ? { ...r, status: 'pending' as const, rate: undefined, transit_days: undefined, quote_number: undefined, error: undefined }
+        : r
+      )
+    )
+    setJob((j) => j ? { ...j, status: 'pending', done_rows: doneCount } : j)
+    setStep('waiting')
+  }
+
+  // ── Reset ──────────────────────────────────────────────────────────────────────────────
   const reset = () => {
     if (channelRef.current) supabase.removeChannel(channelRef.current)
     setStep('upload')
@@ -566,6 +591,11 @@ export default function QuoterPage() {
                 Download Results (.xlsx)
               </button>
             )}
+            {errors > 0 && (
+              <button className={styles.btnSecondary} onClick={rerunErrors}>
+                ↺ Re-run {errors} Error{errors !== 1 ? 's' : ''}
+              </button>
+            )}
             <button className={styles.btnSecondary} onClick={reset}>Start Over</button>
           </div>
         </div>
@@ -574,7 +604,7 @@ export default function QuoterPage() {
   )
 }
 
-// ── Sub-components ─────────────────────────────────────────────────────────────
+// ── Sub-components ─────────────────────────────────────────────────────────────────────────────
 
 function StepIndicator({ current }: { current: Step }) {
   const steps: { key: Step; label: string }[] = [
