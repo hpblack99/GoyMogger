@@ -258,28 +258,28 @@ class FFEQuoter:
 
         cfg = CONFIG["quote_form"]
 
-        # ── Origin / destination ──────────────────────────────────────────────
+        # ── Origin / destination ──────────────────────────────────────────────────────
         origin_zip_padded = str(row["origin_zip"]).strip().zfill(5)
         dest_zip_padded = str(row["dest_zip"]).strip().zfill(5)
         self.page.fill(cfg["origin_zip"], origin_zip_padded)
         self.page.fill(cfg["dest_zip"],   dest_zip_padded)
 
-        # ── Weight ───────────────────────────────────────────────────────────
+        # ── Weight ───────────────────────────────────────────────────────────────
         # page.fill() clears the field before typing, overwriting the default 0
         weight_str = str(int(float(str(row["weight"]))))
         if not self.page.query_selector(cfg["weight"]):
             raise RuntimeError(f"Weight field '{cfg['weight']}' not found on form.")
         self.page.fill(cfg["weight"], weight_str)
 
-        # ── Freight class / commodity → FFE select option ────────────────────
+        # ── Freight class / commodity → FFE select option ────────────────────────
         _select_class_option(self.page, cfg["freight_class"], str(row["freight_class"]))
 
-        # ── Accessorials ─────────────────────────────────────────────────────
+        # ── Accessorials ─────────────────────────────────────────────────────────────
         self._apply_accessorials()
 
         _screenshot(self.page, f"05-form-filled-row{row['row_index']}")
 
-        # ── Submit ────────────────────────────────────────────────────────────
+        # ── Submit ────────────────────────────────────────────────────────────────
         # FFE may ignore clicks as an anti-automation measure. We click up to
         # MAX_CLICKS times, verifying after each whether the page navigated.
         # Guards:
@@ -330,7 +330,7 @@ class FFEQuoter:
         if "/Account/Login" in self.page.url:
             raise RuntimeError("Session expired mid-job; re-login required.")
 
-        # ── Parse results ─────────────────────────────────────────────────────
+        # ── Parse results ───────────────────────────────────────────────────────────────
         res = CONFIG["results"]
         quote_number = _get_text(self.page, res["quote_number"])
         raw_rate     = _get_text(self.page, res["total_charge"])
@@ -424,9 +424,9 @@ class FFEQuoter:
                 time.sleep(DELAY_BETWEEN_QUOTES)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────────────────────────────────────
 # Helpers
-# ─────────────────────────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────────────────────────────────────
 
 def _select_class_option(page: Page, selector: str, value: str) -> None:
     """
