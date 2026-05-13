@@ -35,8 +35,8 @@ FFE_PASSWORD        = os.environ["FFE_PASSWORD"]
 DEBUG               = os.environ.get("DEBUG", "").lower() == "true"
 POLL_INTERVAL       = int(os.environ.get("POLL_INTERVAL", "5"))   # seconds
 
-# ─── Graceful shutdown ────────────────────────────────────────────────────────
-_shutdown = False
+# ─── Graceful shutdown ────────────────────────────────────────────────────
+shutdown = False
 
 def _handle_signal(*_):
     global _shutdown
@@ -46,7 +46,7 @@ def _handle_signal(*_):
 signal.signal(signal.SIGINT,  _handle_signal)
 signal.signal(signal.SIGTERM, _handle_signal)
 
-# ─── Supabase helpers ─────────────────────────────────────────────────────────
+# ─── Supabase helpers ────────────────────────────────────────────────────────
 
 def claim_job(sb: Client) -> dict | None:
     """Atomically grab the oldest pending job and mark it running."""
@@ -121,7 +121,7 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-# ─── Network error detection ──────────────────────────────────────────────────────
+# ─── Network error detection ───────────────────────────────────────────────────────────
 
 _NETWORK_ERROR_PATTERNS = [
     "WinError 10054",   # Windows: connection forcibly closed by remote
@@ -150,7 +150,7 @@ def requeue_job(sb: Client, job_id: str, done_rows: int) -> None:
     }).eq("id", job_id).execute()
 
 
-# ─── Job processor ───────────────────────────────────────────────────────────
+# ─── Job processor ─────────────────────────────────────────────────────────────────
 
 def process_job(sb: Client, job: dict) -> None:
     job_id = job["id"]
@@ -163,15 +163,12 @@ def process_job(sb: Client, job: dict) -> None:
         return
 
     print(f"[Worker] {len(rows)} pending shipment(s) to quote. debug={DEBUG}")
-    # Start counter from already-completed rows so the progress bar stays accurate
-    # when re-running only the error lanes from a previous attempt.
     done = job.get("done_rows", 0)
 
     def on_row_done(row_id: str, result: dict, error: str | None) -> None:
         nonlocal done
         update_row_result(sb, row_id, result, error)
         done += 1
-        # Keep job's done_rows counter live so UI progress bar updates
         sb.table("quote_jobs").update({
             "done_rows": done,
             "updated_at": _now(),
@@ -181,7 +178,6 @@ def process_job(sb: Client, job: dict) -> None:
 
     try:
         with FFEQuoter(debug=DEBUG) as quoter:
-            # Signal each row as processing right before we quote it
             original_get_quote = quoter.get_quote
 
             def get_quote_with_signal(row):
@@ -189,7 +185,8 @@ def process_job(sb: Client, job: dict) -> None:
                 return original_get_quote(row)
 
             quoter.get_quote = get_quote_with_signal
-            quoter.process_job(rows, FFE_USERNAME, FFE_PASSWORD, on_row_done)
+            quoter.process_job(rows, FFE_USERNAME, FFE_PASSWORD, on_row_done,
+                               accessorials=job.get("accessorials") or [])
 
         finish_job(sb, job_id, done)
         print(f"[Worker] Job complete. {done}/{len(rows)} rows quoted.")
@@ -206,7 +203,7 @@ def process_job(sb: Client, job: dict) -> None:
             finish_job(sb, job_id, done, error=err)
 
 
-# ─── Main loop ────────────────────────────────────────────────────────────────
+# ─── Main loop ────────────────────────────────────────────────────────────────────
 
 def main() -> None:
     sb = create_client(SUPABASE_URL, SUPABASE_KEY)
