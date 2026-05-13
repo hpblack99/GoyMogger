@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
+import { ACCESSORIALS } from '../lib/accessorials'
 import styles from './QuoterPage.module.css'
 
 // ── FFE #Item1_ClassId options — exact labels from live DOM ─────────────────────
@@ -191,13 +192,22 @@ export default function QuoterPage() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [isDragging, setIsDragging]   = useState(false)
   const [uploading, setUploading]     = useState(false)
-  const [freightClass, setFreightClass] = useState('')
-  const [quoteName, setQuoteName]       = useState('')
+  const [freightClass, setFreightClass]             = useState('')
+  const [quoteName, setQuoteName]                   = useState('')
+  const [selectedAccessorials, setSelectedAccessorials] = useState<Set<string>>(new Set())
   const [marginPct,  setMarginPct]      = useState(15)
   const [minProfit,  setMinProfit]      = useState(75)
   const [maxProfit,  setMaxProfit]      = useState(500)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const channelRef   = useRef<ReturnType<typeof supabase.channel> | null>(null)
+
+  const toggleAccessorial = (key: string) => {
+    setSelectedAccessorials((prev) => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+  }
 
   // ── Handle file drop/select ───────────────────────────────────────────────────
   const handleFile = useCallback(async (file: File) => {
@@ -237,11 +247,12 @@ export default function QuoterPage() {
       return
     }
     try {
-      // Try with name first; fall back without it if the column doesn't exist yet
+      // Try with all optional columns first; retry without each if migration not yet applied
       const jobPayload: Record<string, unknown> = {
-        total_rows: parsedRows.length,
-        status: 'pending',
-        name: quoteName.trim() || null,
+        total_rows:   parsedRows.length,
+        status:       'pending',
+        name:         quoteName.trim() || null,
+        accessorials: Array.from(selectedAccessorials),
       }
       let { data: jobData, error: jobErr } = await supabase
         .from('quote_jobs')
@@ -250,8 +261,13 @@ export default function QuoterPage() {
         .single()
 
       if (jobErr?.message?.includes('name')) {
-        // Migration not yet applied — retry without the name column
         delete jobPayload.name
+        const retry = await supabase.from('quote_jobs').insert(jobPayload).select().single()
+        jobData = retry.data
+        jobErr  = retry.error
+      }
+      if (jobErr?.message?.includes('accessorials')) {
+        delete jobPayload.accessorials
         const retry = await supabase.from('quote_jobs').insert(jobPayload).select().single()
         jobData = retry.data
         jobErr  = retry.error
@@ -379,6 +395,7 @@ export default function QuoterPage() {
     setUploadError(null)
     setSubmitError(null)
     setQuoteName('')
+    setSelectedAccessorials(new Set())
   }
 
   const hasClass = freightClass !== ''
@@ -490,6 +507,35 @@ export default function QuoterPage() {
 
               <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" style={{ display: 'none' }} onChange={onFileInput} />
               {uploadError && <p className={styles.errorMsg}>{uploadError}</p>}
+            </div>
+          </div>
+
+          <div className={styles.divider} />
+
+          {/* ── 1c: Accessorials ── */}
+          <div className={styles.checkRow}>
+            <div className={styles.checkIcon}>3</div>
+            <div className={styles.checkBody}>
+              <label className={styles.classLabel}>
+                Accessorial Services
+                <span className={styles.optionalTag}>Optional</span>
+              </label>
+              <p className={styles.classHint}>Select any that apply — applied to all lanes in this batch.</p>
+              <div className={styles.accessorialGrid}>
+                {ACCESSORIALS.map((a) => (
+                  <label key={a.key} className={styles.accessorialItem}>
+                    <input
+                      type="checkbox"
+                      checked={selectedAccessorials.has(a.key)}
+                      onChange={() => toggleAccessorial(a.key)}
+                    />
+                    <span>
+                      {a.label}
+                      {a.note && <span className={styles.accessorialNote}> ({a.note})</span>}
+                    </span>
+                  </label>
+                ))}
+              </div>
             </div>
           </div>
 

@@ -24,6 +24,17 @@
     "total_charge": ".table-ffe-darkgreay-row td:last-child b",
     "transit_days": ".transit-days, [id*='Transit'], td:has-text('Transit'), .table-ffe td b"
   },
+  "accessorials": {
+    "inside_pickup_delivery":    "Inside Pickup",
+    "ltl_night_pickup_delivery": "LTL Night Pickup",
+    "locations_without_dock":    "Locations without Dock",
+    "convention_center":         "Convention Center",
+    "restricted_security":       "Restricted Security",
+    "guaranteed_service":        "Guaranteed Service",
+    "liftgate_fee":              "Liftgate Fee",
+    "multi_temperature":         "Multi-temperature",
+    "limited_access":            "Limited Access"
+  },
   "class_id_map": {
     "55":   "27",
     "60":   "28",

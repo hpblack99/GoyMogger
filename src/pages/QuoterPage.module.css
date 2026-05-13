@@ -751,3 +751,47 @@
   font-size: 0.8rem;
   color: var(--color-neutral-500);
 }
+
+/* ── Accessorials grid ── */
+.accessorialGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px 16px;
+  margin-top: 4px;
+}
+
+.accessorialItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--color-neutral-700);
+  cursor: pointer;
+  line-height: 1.45;
+}
+
+.accessorialItem input[type='checkbox'] {
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--color-primary-600);
+  cursor: pointer;
+}
+
+.accessorialNote {
+  color: var(--color-neutral-400);
+  font-size: 0.78rem;
+}
+
+.optionalTag {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: var(--color-neutral-100);
+  color: var(--color-neutral-500);
+  padding: 1px 6px;
+  border-radius: 99px;
+  margin-left: 6px;
+  vertical-align: middle;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}

@@ -189,7 +189,8 @@ def process_job(sb: Client, job: dict) -> None:
                 return original_get_quote(row)
 
             quoter.get_quote = get_quote_with_signal
-            quoter.process_job(rows, FFE_USERNAME, FFE_PASSWORD, on_row_done)
+            quoter.process_job(rows, FFE_USERNAME, FFE_PASSWORD, on_row_done,
+                               accessorials=job.get("accessorials") or [])
 
         finish_job(sb, job_id, done)
         print(f"[Worker] Job complete. {done}/{len(rows)} rows quoted.")

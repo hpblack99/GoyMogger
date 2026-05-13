@@ -96,6 +96,7 @@ class FFEQuoter:
         self._page: Page | None = None
         self._username: str | None = None
         self._password: str | None = None
+        self._job_accessorials: list[str] = []
 
     def __enter__(self):
         self._playwright = sync_playwright().start()
@@ -273,6 +274,9 @@ class FFEQuoter:
         # ── Freight class / commodity → FFE select option ────────────────────
         _select_class_option(self.page, cfg["freight_class"], str(row["freight_class"]))
 
+        # ── Accessorials ─────────────────────────────────────────────────────
+        self._apply_accessorials()
+
         _screenshot(self.page, f"05-form-filled-row{row['row_index']}")
 
         # ── Submit ────────────────────────────────────────────────────────────
@@ -356,17 +360,36 @@ class FFEQuoter:
     # Process all rows for a job
     # ─────────────────────────────────────────────────────────────────────────
 
+    def _apply_accessorials(self) -> None:
+        """Check FFE accessorial checkboxes based on job configuration."""
+        if not self._job_accessorials:
+            return
+        acc_map = CONFIG.get("accessorials", {})
+        for key in self._job_accessorials:
+            label_text = acc_map.get(key)
+            if not label_text:
+                continue
+            try:
+                cb = self.page.get_by_label(re.compile(re.escape(label_text), re.IGNORECASE))
+                if cb.count() > 0 and not cb.first.is_checked():
+                    cb.first.check()
+            except Exception as e:
+                print(f"  [FFE] Warning: could not check accessorial '{key}': {e}")
+
     def process_job(
         self,
         rows: list[dict],
         username: str,
         password: str,
         on_row_done,
+        accessorials: list[str] | None = None,
     ) -> None:
         """
         on_row_done(row_id, result_dict, error_str) — called after every row.
         result_dict keys: rate, transit_days, quote_number
+        accessorials: list of accessorial keys to check on each form submission
         """
+        self._job_accessorials = list(accessorials or [])
         self.login(username, password)
         self.navigate_to_rate_request()
 

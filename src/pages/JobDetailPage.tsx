@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
+import { ACCESSORIAL_MAP } from '../lib/accessorials'
 import styles from './JobDetailPage.module.css'
 
 interface QuoteJob {
@@ -13,6 +14,7 @@ interface QuoteJob {
   error?: string
   created_at: string
   updated_at: string
+  accessorials?: string[]
 }
 
 interface QuoteRow {
@@ -341,6 +343,18 @@ export default function JobDetailPage() {
             <span className={styles.statLbl}>Complete</span>
           </div>
         </div>
+
+        {/* Accessorials chips */}
+        {job_.accessorials && job_.accessorials.length > 0 && (
+          <div className={styles.accessorialsRow}>
+            <span className={styles.accessorialsLbl}>Accessorials:</span>
+            {job_.accessorials.map((key) => (
+              <span key={key} className={styles.accessorialChip}>
+                {ACCESSORIAL_MAP[key]?.label ?? key}
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Progress bar (visible when running or pending) */}
         {(job_.status === 'running' || job_.status === 'pending') && (

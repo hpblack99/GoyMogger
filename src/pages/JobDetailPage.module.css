@@ -343,3 +343,29 @@
   font-size: 0.8rem;
   color: var(--color-neutral-500);
 }
+
+/* ── Accessorials ── */
+.accessorialsRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.83rem;
+}
+
+.accessorialsLbl {
+  font-weight: 600;
+  color: var(--color-neutral-500);
+  white-space: nowrap;
+}
+
+.accessorialChip {
+  display: inline-block;
+  padding: 2px 10px;
+  background: var(--color-primary-50);
+  color: var(--color-primary-700);
+  border: 1px solid var(--color-primary-200);
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
