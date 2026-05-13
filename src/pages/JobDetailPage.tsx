@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
+import { ACCESSORIAL_MAP } from '../lib/accessorials'
 import styles from './JobDetailPage.module.css'
 
 interface QuoteJob {
@@ -13,6 +14,7 @@ interface QuoteJob {
   error?: string
   created_at: string
   updated_at: string
+  accessorials?: string[]
 }
 
 interface QuoteRow {
@@ -132,7 +134,6 @@ export default function JobDetailPage() {
   const [now, setNow] = useState(() => Date.now())
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
-  // Tick every 30s so the "Paused" badge updates without a page reload
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000)
     return () => clearInterval(t)
@@ -141,7 +142,6 @@ export default function JobDetailPage() {
   useEffect(() => {
     if (!id) return
 
-    // Initial load
     Promise.all([
       supabase.from('quote_jobs').select('*').eq('id', id).single(),
       supabase.from('quote_rows').select('*').eq('job_id', id).order('row_index'),
@@ -152,7 +152,6 @@ export default function JobDetailPage() {
       setLoading(false)
     })
 
-    // Real-time subscriptions — immediate updates via Supabase websocket
     const channel = supabase
       .channel(`job-detail-${id}`)
       .on(
@@ -176,7 +175,6 @@ export default function JobDetailPage() {
       )
       .subscribe()
 
-    // Polling fallback — catches missed realtime events; stops when job finishes
     let pollId: ReturnType<typeof setInterval>
     pollId = setInterval(async () => {
       const { data: jobData } = await supabase.from('quote_jobs').select('*').eq('id', id).single()
@@ -201,8 +199,6 @@ export default function JobDetailPage() {
   const handleRequeue = async () => {
     if (!job) return
     setRequeueing(true)
-    // Complete jobs: full reset so every lane re-runs from scratch.
-    // Error/paused jobs: smart reset — preserve complete rows, only retry the rest.
     const isFullReset = job.status === 'complete'
     const doneCount   = isFullReset ? 0 : rows.filter((r) => r.status === 'complete').length
     const rowsQuery   = supabase.from('quote_rows')
@@ -223,7 +219,6 @@ export default function JobDetailPage() {
 
   const handleRerunErrors = async () => {
     if (!job) return
-    // Reset error rows + any rows stuck in processing from a prior crash
     const resetIds  = rows.filter((r) => r.status === 'error' || r.status === 'processing').map((r) => r.id)
     const doneCount = rows.filter((r) => r.status === 'complete').length
     if (!resetIds.length) return
@@ -258,7 +253,6 @@ export default function JobDetailPage() {
   const pct = job_.total_rows > 0 ? Math.round((job_.done_rows / job_.total_rows) * 100) : 0
   const completedCount = rows.filter((r) => r.status === 'complete').length
   const errorCount     = rows.filter((r) => r.status === 'error').length
-  // A "running" job is considered paused if it hasn't been updated in > 90s
   const isPaused = job_.status === 'running' && (now - new Date(job_.updated_at).getTime()) > 90_000
 
   const filteredRows = statusFilter === 'all' ? rows : rows.filter((r) => r.status === statusFilter)
@@ -273,14 +267,12 @@ export default function JobDetailPage() {
 
   return (
     <div className={styles.page}>
-      {/* Breadcrumb */}
       <div className={styles.breadcrumb}>
         <Link to="/jobs" className={styles.breadcrumbLink}>Bids</Link>
         <span className={styles.breadcrumbSep}>/</span>
         <span className={styles.breadcrumbCurrent}>{job_.id.slice(0, 8).toUpperCase()}</span>
       </div>
 
-      {/* Job header card */}
       <div className={styles.headerCard}>
         <div className={styles.headerTop}>
           <div className={styles.headerMeta}>
@@ -322,7 +314,6 @@ export default function JobDetailPage() {
           </div>
         </div>
 
-        {/* Stats row */}
         <div className={styles.statsRow}>
           <div className={styles.statItem}>
             <span className={styles.statNum}>{job_.total_rows}</span>
@@ -342,7 +333,17 @@ export default function JobDetailPage() {
           </div>
         </div>
 
-        {/* Progress bar (visible when running or pending) */}
+        {job_.accessorials && job_.accessorials.length > 0 && (
+          <div className={styles.accessorialsRow}>
+            <span className={styles.accessorialsLbl}>Accessorials:</span>
+            {job_.accessorials.map((key) => (
+              <span key={key} className={styles.accessorialChip}>
+                {ACCESSORIAL_MAP[key]?.label ?? key}
+              </span>
+            ))}
+          </div>
+        )}
+
         {(job_.status === 'running' || job_.status === 'pending') && (
           <div className={styles.progressSection}>
             <div className={styles.progressBar}>
@@ -356,14 +357,12 @@ export default function JobDetailPage() {
         )}
       </div>
 
-      {/* Worker hint if pending or paused */}
       {(job_.status === 'pending' || isPaused) && (
         <div className={styles.workerHint}>
           <strong>{isPaused ? 'Worker stopped.' : 'Waiting for Python worker.'}</strong> Run <code>cd python && python worker.py</code> to {isPaused ? 'resume' : 'start'} processing.
         </div>
       )}
 
-      {/* Pricing controls */}
       {rows.some((r) => r.rate) && (
         <PricingPanel
           marginPct={marginPct} minProfit={minProfit} maxProfit={maxProfit}
@@ -372,7 +371,6 @@ export default function JobDetailPage() {
         />
       )}
 
-      {/* Row filter tabs */}
       <div className={styles.rowFilterBar}>
         {(['all', 'complete', 'error', 'processing', 'pending'] as const).map((s) => (
           <button
@@ -388,7 +386,6 @@ export default function JobDetailPage() {
         ))}
       </div>
 
-      {/* Rows table */}
       <div className={styles.tableCard}>
         <div className={styles.tableWrapper}>
           <table className={styles.table}>
