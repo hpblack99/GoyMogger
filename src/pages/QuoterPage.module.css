@@ -1,753 +1,151 @@
-.page {
-  max-width: 1100px;
-  margin: 0 auto;
-}
-
-.header {
-  margin-bottom: 32px;
-}
-
-.title {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: var(--color-neutral-900);
-  margin-bottom: 8px;
-}
-
-.subtitle {
-  color: var(--color-neutral-500);
-  font-size: 0.95rem;
-  margin-bottom: 24px;
-}
+.page { max-width: 1100px; margin: 0 auto; }
+.header { margin-bottom: 32px; }
+.title { font-size: 1.75rem; font-weight: 700; color: var(--color-neutral-900); margin-bottom: 8px; }
+.subtitle { color: var(--color-neutral-500); font-size: 0.95rem; margin-bottom: 24px; }
 
 /* ── Step indicator ── */
-.steps {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  margin-bottom: 8px;
-}
-
-.step {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--color-neutral-400);
-  font-size: 0.85rem;
-  font-weight: 500;
-}
-
-.step::after {
-  content: '';
-  display: block;
-  width: 40px;
-  height: 2px;
-  background: var(--color-neutral-200);
-  margin: 0 8px;
-}
-
-.step:last-child::after {
-  display: none;
-}
-
-.stepDot {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--color-neutral-200);
-  color: var(--color-neutral-500);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.8rem;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
-.stepActive .stepDot {
-  background: var(--color-primary-600);
-  color: #fff;
-}
-
-.stepActive .stepLabel {
-  color: var(--color-primary-600);
-}
-
-.stepDone .stepDot {
-  background: var(--color-success-500);
-  color: #fff;
-}
-
-.stepDone .stepLabel {
-  color: var(--color-neutral-600);
-}
+.steps { display: flex; align-items: center; gap: 0; margin-bottom: 8px; }
+.step { display: flex; align-items: center; gap: 8px; color: var(--color-neutral-400); font-size: 0.85rem; font-weight: 500; }
+.step::after { content: ''; display: block; width: 40px; height: 2px; background: var(--color-neutral-200); margin: 0 8px; }
+.step:last-child::after { display: none; }
+.stepDot { width: 28px; height: 28px; border-radius: 50%; background: var(--color-neutral-200); color: var(--color-neutral-500); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; flex-shrink: 0; }
+.stepActive .stepDot { background: var(--color-primary-600); color: #fff; }
+.stepActive .stepLabel { color: var(--color-primary-600); }
+.stepDone .stepDot { background: var(--color-success-500); color: #fff; }
+.stepDone .stepLabel { color: var(--color-neutral-600); }
 
 /* ── Card ── */
-.card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-neutral-200);
-  border-radius: 12px;
-  padding: 32px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-}
+.card { background: var(--color-surface); border: 1px solid var(--color-neutral-200); border-radius: 12px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.cardTitle { font-size: 1.2rem; font-weight: 700; color: var(--color-neutral-900); margin-bottom: 16px; }
+.hint { font-size: 0.88rem; color: var(--color-neutral-500); margin-bottom: 20px; line-height: 1.6; }
+.hint code { font-family: monospace; background: var(--color-neutral-100); padding: 1px 5px; border-radius: 4px; font-size: 0.85em; }
 
-.cardTitle {
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: var(--color-neutral-900);
-  margin-bottom: 16px;
-}
+/* ── Checklist rows ── */
+.checkRow { display: flex; gap: 16px; align-items: flex-start; }
+.checkIcon { width: 32px; height: 32px; border-radius: 50%; background: var(--color-neutral-200); color: var(--color-neutral-500); font-size: 0.85rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; transition: background 0.2s, color 0.2s; }
+.checkRowDone .checkIcon { background: var(--color-success-500); color: #fff; }
+.checkBody { flex: 1; min-width: 0; }
 
-.hint {
-  font-size: 0.88rem;
-  color: var(--color-neutral-500);
-  margin-bottom: 20px;
-  line-height: 1.6;
-}
+/* ── File confirmed ── */
+.fileConfirm { display: flex; align-items: center; gap: 10px; background: var(--color-neutral-50); border: 1px solid var(--color-neutral-200); border-radius: 8px; padding: 10px 14px; margin-top: 4px; }
+.fileIcon { font-size: 1.2rem; }
+.fileName { font-size: 0.9rem; font-weight: 600; color: var(--color-neutral-800); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fileCount { font-size: 0.82rem; color: var(--color-neutral-500); white-space: nowrap; }
+.changeFile { background: none; border: none; color: var(--color-primary-600); font-size: 0.82rem; font-weight: 600; cursor: pointer; padding: 0; white-space: nowrap; }
+.changeFile:hover { text-decoration: underline; }
 
-.hint code {
-  font-family: monospace;
-  background: var(--color-neutral-100);
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-size: 0.85em;
-}
+.continueHint { font-size: 0.83rem; color: var(--color-neutral-400); align-self: center; }
+.colAliasInline { color: var(--color-neutral-400); font-size: 0.8em; }
 
-/* ── Checklist rows (class + file) ── */
-.checkRow {
-  display: flex;
-  gap: 16px;
-  align-items: flex-start;
-}
-
-.checkIcon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--color-neutral-200);
-  color: var(--color-neutral-500);
-  font-size: 0.85rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  margin-top: 2px;
-  transition: background 0.2s, color 0.2s;
-}
-
-.checkRowDone .checkIcon {
-  background: var(--color-success-500);
-  color: #fff;
-}
-
-.checkBody {
-  flex: 1;
-  min-width: 0;
-}
-
-/* ── File confirmed state ── */
-.fileConfirm {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--color-neutral-50);
-  border: 1px solid var(--color-neutral-200);
-  border-radius: 8px;
-  padding: 10px 14px;
-  margin-top: 4px;
-}
-
-.fileIcon {
-  font-size: 1.2rem;
-}
-
-.fileName {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--color-neutral-800);
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fileCount {
-  font-size: 0.82rem;
-  color: var(--color-neutral-500);
-  white-space: nowrap;
-}
-
-.changeFile {
-  background: none;
-  border: none;
-  color: var(--color-primary-600);
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
-  white-space: nowrap;
-}
-
-.changeFile:hover {
-  text-decoration: underline;
-}
-
-/* ── Continue hint ── */
-.continueHint {
-  font-size: 0.83rem;
-  color: var(--color-neutral-400);
-  align-self: center;
-}
-
-.colAliasInline {
-  color: var(--color-neutral-400);
-  font-size: 0.8em;
-}
-
-/* ── Class / commodity selector ── */
-.classField {
-  margin-bottom: 20px;
-}
-
-.nameField {
-  margin-bottom: 20px;
-  max-width: 480px;
-}
-
-.classLabel {
-  display: block;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--color-neutral-800);
-  margin-bottom: 4px;
-}
-
-.required {
-  color: var(--color-error-500);
-}
-
-.classHint {
-  font-size: 0.83rem;
-  color: var(--color-neutral-400);
-  margin-bottom: 10px;
-}
-
-.select {
-  padding: 10px 14px;
-  border: 1px solid var(--color-neutral-300);
-  border-radius: 8px;
-  font-size: 0.95rem;
-  color: var(--color-neutral-900);
-  background: var(--color-surface);
-  transition: border-color 0.15s;
-  outline: none;
-  width: 100%;
-  max-width: 480px;
-  cursor: pointer;
-}
-
-.select:focus {
-  border-color: var(--color-primary-500);
-  box-shadow: 0 0 0 3px var(--color-primary-100);
-}
-
-.selectEmpty {
-  color: var(--color-neutral-400);
-}
-
-.divider {
-  height: 1px;
-  background: var(--color-neutral-100);
-  margin: 20px 0;
-}
-
-.colAliases {
-  font-size: 0.8rem;
-  color: var(--color-neutral-400);
-  margin-bottom: 16px;
-  line-height: 1.5;
-}
-
-.batchBadge {
-  display: inline-block;
-  background: var(--color-primary-50);
-  color: var(--color-primary-700);
-  border: 1px solid var(--color-primary-200);
-  border-radius: 8px;
-  padding: 8px 14px;
-  font-size: 0.88rem;
-  margin-bottom: 16px;
-}
+/* ── Class selector ── */
+.nameField { margin-bottom: 20px; max-width: 480px; }
+.classLabel { display: block; font-size: 0.95rem; font-weight: 700; color: var(--color-neutral-800); margin-bottom: 4px; }
+.classHint { font-size: 0.83rem; color: var(--color-neutral-400); margin-bottom: 10px; }
+.select { padding: 10px 14px; border: 1px solid var(--color-neutral-300); border-radius: 8px; font-size: 0.95rem; color: var(--color-neutral-900); background: var(--color-surface); transition: border-color 0.15s; outline: none; width: 100%; max-width: 480px; cursor: pointer; }
+.select:focus { border-color: var(--color-primary-500); box-shadow: 0 0 0 3px var(--color-primary-100); }
+.selectEmpty { color: var(--color-neutral-400); }
+.divider { height: 1px; background: var(--color-neutral-100); margin: 20px 0; }
+.batchBadge { display: inline-block; background: var(--color-primary-50); color: var(--color-primary-700); border: 1px solid var(--color-primary-200); border-radius: 8px; padding: 8px 14px; font-size: 0.88rem; margin-bottom: 16px; }
 
 /* ── Dropzone ── */
-.dropzone {
-  border: 2px dashed var(--color-neutral-300);
-  border-radius: 10px;
-  padding: 48px 32px;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  background: var(--color-neutral-50);
-}
+.dropzone { border: 2px dashed var(--color-neutral-300); border-radius: 10px; padding: 48px 32px; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; display: flex; flex-direction: column; align-items: center; gap: 12px; background: var(--color-neutral-50); }
+.dropzone:hover { border-color: var(--color-primary-400); background: var(--color-primary-50); }
+.dragging { border-color: var(--color-primary-500); background: var(--color-primary-50); }
+.dropIcon { font-size: 2.5rem; }
+.dropText { font-size: 0.95rem; color: var(--color-neutral-500); max-width: 360px; }
 
-.dropzone:hover {
-  border-color: var(--color-primary-400);
-  background: var(--color-primary-50);
-}
-
-.dragging {
-  border-color: var(--color-primary-500);
-  background: var(--color-primary-50);
-}
-
-.dropIcon {
-  font-size: 2.5rem;
-}
-
-.dropText {
-  font-size: 0.95rem;
-  color: var(--color-neutral-500);
-  max-width: 360px;
-}
-
-/* ── Form ── */
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  max-width: 480px;
-  margin-bottom: 24px;
-}
-
-.label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--color-neutral-700);
-}
-
-.input {
-  padding: 10px 14px;
-  border: 1px solid var(--color-neutral-300);
-  border-radius: 8px;
-  font-size: 0.95rem;
-  color: var(--color-neutral-900);
-  background: var(--color-surface);
-  transition: border-color 0.15s;
-  outline: none;
-}
-
-.input:focus {
-  border-color: var(--color-primary-500);
-  box-shadow: 0 0 0 3px var(--color-primary-100);
-}
-
-.checkboxLabel {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  font-size: 0.88rem;
-  color: var(--color-neutral-600);
-  cursor: pointer;
-  line-height: 1.5;
-}
-
-.checkboxLabel input {
-  margin-top: 2px;
-  flex-shrink: 0;
-}
+/* ── Form inputs ── */
+.input { padding: 10px 14px; border: 1px solid var(--color-neutral-300); border-radius: 8px; font-size: 0.95rem; color: var(--color-neutral-900); background: var(--color-surface); transition: border-color 0.15s; outline: none; }
+.input:focus { border-color: var(--color-primary-500); box-shadow: 0 0 0 3px var(--color-primary-100); }
 
 /* ── Actions ── */
-.actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 24px;
-}
-
-.btnPrimary {
-  padding: 10px 22px;
-  background: var(--color-primary-600);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  font-size: 0.92rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.btnPrimary:hover:not(:disabled) {
-  background: var(--color-primary-700);
-}
-
-.btnPrimary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btnSecondary {
-  padding: 10px 22px;
-  background: var(--color-neutral-100);
-  color: var(--color-neutral-700);
-  border: 1px solid var(--color-neutral-200);
-  border-radius: 8px;
-  font-size: 0.92rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.btnSecondary:hover {
-  background: var(--color-neutral-200);
-}
+.actions { display: flex; gap: 12px; margin-top: 24px; }
+.btnPrimary { padding: 10px 22px; background: var(--color-primary-600); color: #fff; border: none; border-radius: 8px; font-size: 0.92rem; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+.btnPrimary:hover:not(:disabled) { background: var(--color-primary-700); }
+.btnPrimary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btnSecondary { padding: 10px 22px; background: var(--color-neutral-100); color: var(--color-neutral-700); border: 1px solid var(--color-neutral-200); border-radius: 8px; font-size: 0.92rem; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+.btnSecondary:hover { background: var(--color-neutral-200); }
 
 /* ── Progress ── */
-.progressSection {
-  margin-bottom: 24px;
-}
+.progressSection { margin-bottom: 24px; }
+.progressBar { width: 100%; height: 10px; background: var(--color-neutral-200); border-radius: 99px; overflow: hidden; margin-bottom: 8px; }
+.progressFill { height: 100%; background: var(--color-primary-500); border-radius: 99px; transition: width 0.4s ease; }
+.progressLabel { font-size: 0.85rem; color: var(--color-neutral-500); margin-bottom: 8px; }
+.progressComplete { background: var(--color-success-500) !important; }
+.progressProcessing { background: var(--color-primary-500) !important; }
+.progressError { background: var(--color-error-500) !important; }
+.progressStats { display: flex; gap: 20px; font-size: 0.83rem; color: var(--color-neutral-600); }
+.progressStat { display: flex; align-items: center; gap: 6px; }
+.statDot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
 
-.progressBar {
-  width: 100%;
-  height: 10px;
-  background: var(--color-neutral-200);
-  border-radius: 99px;
-  overflow: hidden;
-  margin-bottom: 8px;
-}
+/* ── Waiting ── */
+.codeBlock { background: var(--color-neutral-900); color: #a5f3fc; padding: 14px 18px; border-radius: 8px; font-size: 0.9rem; font-family: monospace; margin: 12px 0 16px; overflow-x: auto; }
+.jobId { font-family: monospace; font-size: 0.85em; background: var(--color-neutral-100); padding: 2px 6px; border-radius: 4px; }
+.waitSpinnerRow { display: flex; justify-content: center; padding: 24px 0 8px; }
 
-.progressFill {
-  height: 100%;
-  background: var(--color-primary-500);
-  border-radius: 99px;
-  transition: width 0.4s ease;
-}
-
-.progressLabel {
-  font-size: 0.85rem;
-  color: var(--color-neutral-500);
-  margin-bottom: 8px;
-}
-
-.progressComplete {
-  background: var(--color-success-500) !important;
-}
-
-.progressProcessing {
-  background: var(--color-primary-500) !important;
-}
-
-.progressError {
-  background: var(--color-error-500) !important;
-}
-
-.progressStats {
-  display: flex;
-  gap: 20px;
-  font-size: 0.83rem;
-  color: var(--color-neutral-600);
-}
-
-.progressStat {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.statDot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-/* ── Waiting state ── */
-.codeBlock {
-  background: var(--color-neutral-900);
-  color: #a5f3fc;
-  padding: 14px 18px;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  font-family: monospace;
-  margin: 12px 0 16px;
-  overflow-x: auto;
-}
-
-.jobId {
-  font-family: monospace;
-  font-size: 0.85em;
-  background: var(--color-neutral-100);
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.waitSpinnerRow {
-  display: flex;
-  justify-content: center;
-  padding: 24px 0 8px;
-}
-
-/* ── Summary chips ── */
-.summaryRow {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.summaryChip {
-  padding: 8px 16px;
-  background: var(--color-success-500);
-  color: #fff;
-  border-radius: 8px;
-  font-size: 0.88rem;
-  font-weight: 600;
-}
-
-.summaryChipError {
-  background: var(--color-error-500);
-}
-
-.summaryNum {
-  font-size: 1.2rem;
-  font-weight: 700;
-  margin-right: 4px;
-}
+/* ── Summary ── */
+.summaryRow { display: flex; gap: 12px; margin-bottom: 20px; }
+.summaryChip { padding: 8px 16px; background: var(--color-success-500); color: #fff; border-radius: 8px; font-size: 0.88rem; font-weight: 600; }
+.summaryChipError { background: var(--color-error-500); }
+.summaryNum { font-size: 1.2rem; font-weight: 700; margin-right: 4px; }
 
 /* ── Table ── */
-.tableWrapper {
-  overflow-x: auto;
-  margin-bottom: 8px;
-  border: 1px solid var(--color-neutral-200);
-  border-radius: 8px;
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.85rem;
-}
-
-.table th {
-  background: var(--color-neutral-50);
-  color: var(--color-neutral-600);
-  font-weight: 600;
-  text-align: left;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--color-neutral-200);
-  white-space: nowrap;
-}
-
-.table td {
-  padding: 9px 12px;
-  border-bottom: 1px solid var(--color-neutral-100);
-  color: var(--color-neutral-800);
-  vertical-align: middle;
-}
-
-.table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-.table tbody tr:hover {
-  background: var(--color-neutral-50);
-}
-
-.rowComplete td {
-  background: rgba(34, 197, 94, 0.04);
-}
-
-.rowError td {
-  background: rgba(239, 68, 68, 0.04);
-}
-
-.rateCell {
-  font-weight: 700;
-  color: var(--color-success-600);
-}
-
-.notesCell {
-  color: var(--color-error-600);
-  font-size: 0.8rem;
-  max-width: 220px;
-  white-space: normal;
-}
-
-.truncNote {
-  font-size: 0.82rem;
-  color: var(--color-neutral-400);
-  padding: 8px 12px;
-  text-align: center;
-}
+.tableWrapper { overflow-x: auto; margin-bottom: 8px; border: 1px solid var(--color-neutral-200); border-radius: 8px; }
+.table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.table th { background: var(--color-neutral-50); color: var(--color-neutral-600); font-weight: 600; text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--color-neutral-200); white-space: nowrap; }
+.table td { padding: 9px 12px; border-bottom: 1px solid var(--color-neutral-100); color: var(--color-neutral-800); vertical-align: middle; }
+.table tbody tr:last-child td { border-bottom: none; }
+.table tbody tr:hover { background: var(--color-neutral-50); }
+.rowComplete td { background: rgba(34,197,94,0.04); }
+.rowError td { background: rgba(239,68,68,0.04); }
+.rateCell { font-weight: 700; color: var(--color-success-600); }
+.notesCell { color: var(--color-error-600); font-size: 0.8rem; max-width: 220px; white-space: normal; }
+.truncNote { font-size: 0.82rem; color: var(--color-neutral-400); padding: 8px 12px; text-align: center; }
 
 /* ── Badges ── */
-.badge {
-  display: inline-block;
-  padding: 3px 9px;
-  border-radius: 99px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
+.badge { display: inline-block; padding: 3px 9px; border-radius: 99px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
 .statusPending { background: var(--color-neutral-100); color: var(--color-neutral-500); }
 .statusProcessing { background: var(--color-primary-100); color: var(--color-primary-700); }
 .statusComplete { background: rgba(34,197,94,0.15); color: var(--color-success-600); }
 .statusError { background: rgba(239,68,68,0.12); color: var(--color-error-600); }
 
-/* ── Error / misc ── */
-.errorMsg {
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  border-radius: 8px;
-  color: var(--color-error-600);
-  padding: 12px 16px;
-  font-size: 0.88rem;
-  margin-top: 16px;
-  white-space: pre-wrap;
-}
+/* ── Error ── */
+.errorMsg { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); border-radius: 8px; color: var(--color-error-600); padding: 12px 16px; font-size: 0.88rem; margin-top: 16px; white-space: pre-wrap; }
+.errorTitle { color: var(--color-error-600); }
+.spinner { display: inline-block; width: 28px; height: 28px; border: 3px solid var(--color-primary-200); border-top-color: var(--color-primary-600); border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-.errorTitle {
-  color: var(--color-error-600);
-}
+/* ── Pricing ── */
+.pricingPanel { border: 1px solid var(--color-neutral-200); border-radius: 10px; padding: 16px 20px; margin-bottom: 20px; background: var(--color-neutral-100); }
+.pricingHeader { font-size: 0.78rem; font-weight: 700; color: var(--color-neutral-500); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; }
+.pricingInputRow { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 14px; }
+.pricingField { display: flex; flex-direction: column; gap: 4px; }
+.pricingLabel { font-size: 0.78rem; font-weight: 600; color: var(--color-neutral-500); }
+.pricingInput { width: 120px; padding: 7px 10px; border: 1px solid var(--color-neutral-300); border-radius: 6px; font-size: 0.9rem; color: var(--color-neutral-900); background: var(--color-surface); outline: none; }
+.pricingInput:focus { border-color: var(--color-primary-500); box-shadow: 0 0 0 3px var(--color-primary-100); }
+.gpSummaryBar { display: flex; align-items: center; background: var(--color-neutral-50); border: 1px solid var(--color-neutral-200); border-radius: 8px; padding: 10px 0; flex-wrap: wrap; }
+.gpStat { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 20px; }
+.gpDivider { width: 1px; height: 36px; background: var(--color-neutral-200); flex-shrink: 0; }
+.gpStatNum { font-size: 1rem; font-weight: 700; color: var(--color-neutral-900); }
+.gpStatLbl { font-size: 0.7rem; color: var(--color-neutral-500); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+.gpStatHighlight .gpStatNum { color: var(--color-success-600); font-size: 1.1rem; }
+.sellCell { font-weight: 600; color: var(--color-neutral-700); }
+.gpCell { font-weight: 700; color: var(--color-primary-600); }
+.totalsRow td { background: var(--color-neutral-100); border-top: 2px solid var(--color-neutral-200) !important; padding: 10px 12px; }
+.totalsLabel { font-weight: 600; font-size: 0.8rem; color: var(--color-neutral-500); }
 
-.spinner {
-  display: inline-block;
-  width: 28px;
-  height: 28px;
-  border: 3px solid var(--color-primary-200);
-  border-top-color: var(--color-primary-600);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
+/* ── Accessorials grid ── */
+.accessorialGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 16px; margin-top: 4px; }
+.accessorialItem { display: flex; align-items: flex-start; gap: 8px; font-size: 0.85rem; color: var(--color-neutral-700); cursor: pointer; line-height: 1.45; }
+.accessorialItem input[type='checkbox'] { margin-top: 2px; flex-shrink: 0; accent-color: var(--color-primary-600); cursor: pointer; }
+.accessorialNote { color: var(--color-neutral-400); font-size: 0.78rem; }
+.optionalTag { display: inline-block; font-size: 0.7rem; font-weight: 600; background: var(--color-neutral-100); color: var(--color-neutral-500); padding: 1px 6px; border-radius: 99px; margin-left: 6px; vertical-align: middle; text-transform: uppercase; letter-spacing: 0.05em; }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* ── Pricing controls panel ── */
-.pricingPanel {
-  border: 1px solid var(--color-neutral-200);
-  border-radius: 10px;
-  padding: 16px 20px;
-  margin-bottom: 20px;
-  background: var(--color-neutral-100);
-}
-
-.pricingHeader {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: var(--color-neutral-500);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 12px;
-}
-
-.pricingInputRow {
-  display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
-  margin-bottom: 14px;
-}
-
-.pricingField {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.pricingLabel {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--color-neutral-500);
-}
-
-.pricingInput {
-  width: 120px;
-  padding: 7px 10px;
-  border: 1px solid var(--color-neutral-300);
-  border-radius: 6px;
-  font-size: 0.9rem;
-  color: var(--color-neutral-900);
-  background: var(--color-surface);
-  outline: none;
-}
-
-.pricingInput:focus {
-  border-color: var(--color-primary-500);
-  box-shadow: 0 0 0 3px var(--color-primary-100);
-}
-
-/* ── GP summary bar ── */
-.gpSummaryBar {
-  display: flex;
-  align-items: center;
-  background: var(--color-neutral-50);
-  border: 1px solid var(--color-neutral-200);
-  border-radius: 8px;
-  padding: 10px 0;
-  flex-wrap: wrap;
-}
-
-.gpStat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 4px 20px;
-}
-
-.gpDivider {
-  width: 1px;
-  height: 36px;
-  background: var(--color-neutral-200);
-  flex-shrink: 0;
-}
-
-.gpStatNum {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--color-neutral-900);
-}
-
-.gpStatLbl {
-  font-size: 0.7rem;
-  color: var(--color-neutral-500);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-}
-
-.gpStatHighlight .gpStatNum {
-  color: var(--color-success-600);
-  font-size: 1.1rem;
-}
-
-/* ── Table pricing columns ── */
-.sellCell {
-  font-weight: 600;
-  color: var(--color-neutral-700);
-}
-
-.gpCell {
-  font-weight: 700;
-  color: var(--color-primary-600);
-}
-
-/* ── Totals footer row ── */
-.totalsRow td {
-  background: var(--color-neutral-100);
-  border-top: 2px solid var(--color-neutral-200) !important;
-  padding: 10px 12px;
-}
-
-.totalsLabel {
-  font-weight: 600;
-  font-size: 0.8rem;
-  color: var(--color-neutral-500);
-}
+/* ── Misc ── */
+.classField { margin-bottom: 20px; }
+.required { color: var(--color-error-500); }
+.colAliases { font-size: 0.8rem; color: var(--color-neutral-400); margin-bottom: 16px; line-height: 1.5; }
+.form { display: flex; flex-direction: column; gap: 16px; max-width: 480px; margin-bottom: 24px; }
+.label { display: flex; flex-direction: column; gap: 6px; font-size: 0.88rem; font-weight: 600; color: var(--color-neutral-700); }
+.checkboxLabel { display: flex; align-items: flex-start; gap: 10px; font-size: 0.88rem; color: var(--color-neutral-600); cursor: pointer; line-height: 1.5; }
+.checkboxLabel input { margin-top: 2px; flex-shrink: 0; }

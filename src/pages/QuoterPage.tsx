@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
+import { ACCESSORIALS } from '../lib/accessorials'
 import styles from './QuoterPage.module.css'
 
-// ── FFE #Item1_ClassId options — exact labels from live DOM ─────────────────────
 const COMMODITY_OPTIONS = [
   'Animal Food - Not for Human Consumption',
   'Bakery Goods Less Than 12 Pounds Per Cubic Foot',
@@ -32,7 +32,6 @@ const CLASS_OPTIONS = [
   '110', '125', '150', '175', '200', '250', '300', '400', '500',
 ]
 
-// ── Types ──────────────────────────────────────────────────────────────────────────────
 interface ShipmentRow {
   origin_zip: string
   dest_zip:   string
@@ -65,7 +64,6 @@ interface QuoteJob {
 
 type Step = 'upload' | 'preview' | 'waiting' | 'running' | 'done'
 
-// ── Column detection — supports all common header variants ─────────────────────
 const COL_PATTERNS: Record<string, RegExp> = {
   origin_zip: /origin|from.?zip|shipper.?zip/i,
   dest_zip:   /dest(?:ination)?|to.?zip|consignee/i,
@@ -180,7 +178,6 @@ function StatusBadge({ status }: { status: QuoteRow['status'] }) {
   return <span className={`${styles.badge} ${cls}`}>{label}</span>
 }
 
-// ── Main component ──────────────────────────────────────────────────────────────────────
 export default function QuoterPage() {
   const [step, setStep]               = useState<Step>('upload')
   const [parsedRows, setParsedRows]   = useState<ShipmentRow[]>([])
@@ -191,15 +188,23 @@ export default function QuoterPage() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [isDragging, setIsDragging]   = useState(false)
   const [uploading, setUploading]     = useState(false)
-  const [freightClass, setFreightClass] = useState('')
-  const [quoteName, setQuoteName]       = useState('')
+  const [freightClass, setFreightClass]             = useState('')
+  const [quoteName, setQuoteName]                   = useState('')
+  const [selectedAccessorials, setSelectedAccessorials] = useState<Set<string>>(new Set())
   const [marginPct,  setMarginPct]      = useState(15)
   const [minProfit,  setMinProfit]      = useState(75)
   const [maxProfit,  setMaxProfit]      = useState(500)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const channelRef   = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
-  // ── Handle file drop/select ───────────────────────────────────────────────────
+  const toggleAccessorial = (key: string) => {
+    setSelectedAccessorials((prev) => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+  }
+
   const handleFile = useCallback(async (file: File) => {
     setUploadError(null)
     setUploading(true)
@@ -208,7 +213,6 @@ export default function QuoterPage() {
       if (!rows.length) throw new Error('No valid data rows found.')
       setParsedRows(rows)
       setFileName(file.name)
-      // Stay on upload step — user must also select a class before continuing
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Failed to parse file')
     } finally {
@@ -229,7 +233,6 @@ export default function QuoterPage() {
     if (f) handleFile(f)
   }
 
-  // ── Submit job to Supabase ───────────────────────────────────────────────
   const submitJob = async () => {
     setSubmitError(null)
     if (!freightClass) {
@@ -237,11 +240,11 @@ export default function QuoterPage() {
       return
     }
     try {
-      // Try with name first; fall back without it if the column doesn't exist yet
       const jobPayload: Record<string, unknown> = {
-        total_rows: parsedRows.length,
-        status: 'pending',
-        name: quoteName.trim() || null,
+        total_rows:   parsedRows.length,
+        status:       'pending',
+        name:         quoteName.trim() || null,
+        accessorials: Array.from(selectedAccessorials),
       }
       let { data: jobData, error: jobErr } = await supabase
         .from('quote_jobs')
@@ -250,8 +253,13 @@ export default function QuoterPage() {
         .single()
 
       if (jobErr?.message?.includes('name')) {
-        // Migration not yet applied — retry without the name column
         delete jobPayload.name
+        const retry = await supabase.from('quote_jobs').insert(jobPayload).select().single()
+        jobData = retry.data
+        jobErr  = retry.error
+      }
+      if (jobErr?.message?.includes('accessorials')) {
+        delete jobPayload.accessorials
         const retry = await supabase.from('quote_jobs').insert(jobPayload).select().single()
         jobData = retry.data
         jobErr  = retry.error
@@ -280,11 +288,9 @@ export default function QuoterPage() {
     }
   }
 
-  // ── Real-time subscription + polling fallback ────────────────────────────────────────
   useEffect(() => {
     if (!job?.id || step === 'upload' || step === 'preview' || step === 'done') return
 
-    // Fetch current state immediately in case worker already finished
     supabase.from('quote_rows').select('*').eq('job_id', job.id).order('row_index')
       .then(({ data }) => { if (data) setQuoteRows(data as QuoteRow[]) })
 
@@ -296,7 +302,6 @@ export default function QuoterPage() {
         else if (data.status === 'running') setStep('running')
       })
 
-    // Realtime channel
     const channel = supabase
       .channel(`job-${job.id}`)
       .on('postgres_changes',
@@ -318,8 +323,6 @@ export default function QuoterPage() {
 
     channelRef.current = channel
 
-    // Polling fallback — catches updates if realtime delivery lags.
-    // Also refreshes rows while running so per-row status updates in real-time.
     const poll = setInterval(async () => {
       const { data: jobData } = await supabase.from('quote_jobs').select('*').eq('id', job.id).single()
       if (!jobData) return
@@ -331,7 +334,6 @@ export default function QuoterPage() {
         clearInterval(poll)
       } else if (jobData.status === 'running') {
         setStep('running')
-        // Always re-fetch rows while running so complete/error/processing shows immediately
         const { data: rowData } = await supabase.from('quote_rows').select('*').eq('job_id', job.id).order('row_index')
         if (rowData) setQuoteRows(rowData as QuoteRow[])
       }
@@ -343,10 +345,8 @@ export default function QuoterPage() {
     }
   }, [job?.id, step === 'upload' || step === 'preview']) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Re-run error lanes ───────────────────────────────────────────────────────────
   const rerunErrors = async () => {
     if (!job) return
-    // Reset error rows + any stuck-processing rows from a prior crash
     const resetIds  = quoteRows.filter((r) => r.status === 'error' || r.status === 'processing').map((r) => r.id)
     const doneCount = quoteRows.filter((r) => r.status === 'complete').length
     if (!resetIds.length) return
@@ -368,7 +368,6 @@ export default function QuoterPage() {
     setStep('waiting')
   }
 
-  // ── Reset ──────────────────────────────────────────────────────────────────────────────
   const reset = () => {
     if (channelRef.current) supabase.removeChannel(channelRef.current)
     setStep('upload')
@@ -379,6 +378,7 @@ export default function QuoterPage() {
     setUploadError(null)
     setSubmitError(null)
     setQuoteName('')
+    setSelectedAccessorials(new Set())
   }
 
   const hasClass = freightClass !== ''
@@ -399,7 +399,6 @@ export default function QuoterPage() {
         <StepIndicator current={step} />
       </div>
 
-      {/* ── STEP 1: Upload ── */}
       {step === 'upload' && (
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>Step 1 — Set Up Your Batch</h2>
@@ -417,13 +416,10 @@ export default function QuoterPage() {
           </div>
           <div className={styles.divider} />
 
-          {/* ── 1a: Class selector ── */}
           <div className={`${styles.checkRow} ${hasClass ? styles.checkRowDone : ''}`}>
             <div className={styles.checkIcon}>{hasClass ? '✓' : '1'}</div>
             <div className={styles.checkBody}>
-              <label className={styles.classLabel}>
-                Freight Class / Commodity Type
-              </label>
+              <label className={styles.classLabel}>Freight Class / Commodity Type</label>
               <p className={styles.classHint}>Applies to every shipment in this batch.</p>
               <select
                 className={`${styles.select} ${!hasClass ? styles.selectEmpty : ''}`}
@@ -432,14 +428,10 @@ export default function QuoterPage() {
               >
                 <option value="">— Select class or commodity —</option>
                 <optgroup label="Commodity Type">
-                  {COMMODITY_OPTIONS.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
+                  {COMMODITY_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
                 </optgroup>
                 <optgroup label="Freight Class">
-                  {CLASS_OPTIONS.map((c) => (
-                    <option key={c} value={`Class ${c}`}>Class {c}</option>
-                  ))}
+                  {CLASS_OPTIONS.map((c) => <option key={c} value={`Class ${c}`}>Class {c}</option>)}
                 </optgroup>
               </select>
             </div>
@@ -447,7 +439,6 @@ export default function QuoterPage() {
 
           <div className={styles.divider} />
 
-          {/* ── 1b: File upload ── */}
           <div className={`${styles.checkRow} ${hasFile ? styles.checkRowDone : ''}`}>
             <div className={styles.checkIcon}>{hasFile ? '✓' : '2'}</div>
             <div className={styles.checkBody}>
@@ -456,18 +447,12 @@ export default function QuoterPage() {
                 Required columns: <code>Origin ZIP</code> · <code>Dest ZIP</code> · <code>Weight</code><br />
                 <span className={styles.colAliasInline}>Also: From Zip, To Zip, Gross Weight, etc.</span>
               </p>
-
               {hasFile ? (
                 <div className={styles.fileConfirm}>
                   <span className={styles.fileIcon}>📄</span>
                   <span className={styles.fileName}>{fileName}</span>
                   <span className={styles.fileCount}>{parsedRows.length} row{parsedRows.length !== 1 ? 's' : ''}</span>
-                  <button
-                    className={styles.changeFile}
-                    onClick={() => { setParsedRows([]); setFileName(null); setUploadError(null); fileInputRef.current?.click() }}
-                  >
-                    Change
-                  </button>
+                  <button className={styles.changeFile} onClick={() => { setParsedRows([]); setFileName(null); setUploadError(null); fileInputRef.current?.click() }}>Change</button>
                 </div>
               ) : (
                 <div
@@ -479,15 +464,9 @@ export default function QuoterPage() {
                 >
                   {uploading
                     ? <span className={styles.spinner} />
-                    : <>
-                        <span className={styles.dropIcon}>📂</span>
-                        <span className={styles.dropText}>
-                          {isDragging ? 'Drop it!' : 'Drag & drop .csv / .xlsx / .xls, or click to browse'}
-                        </span>
-                      </>}
+                    : <><span className={styles.dropIcon}>📂</span><span className={styles.dropText}>{isDragging ? 'Drop it!' : 'Drag & drop .csv / .xlsx / .xls, or click to browse'}</span></>}
                 </div>
               )}
-
               <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" style={{ display: 'none' }} onChange={onFileInput} />
               {uploadError && <p className={styles.errorMsg}>{uploadError}</p>}
             </div>
@@ -495,12 +474,36 @@ export default function QuoterPage() {
 
           <div className={styles.divider} />
 
+          <div className={styles.checkRow}>
+            <div className={styles.checkIcon}>3</div>
+            <div className={styles.checkBody}>
+              <label className={styles.classLabel}>
+                Accessorial Services
+                <span className={styles.optionalTag}>Optional</span>
+              </label>
+              <p className={styles.classHint}>Select any that apply — applied to all lanes in this batch.</p>
+              <div className={styles.accessorialGrid}>
+                {ACCESSORIALS.map((a) => (
+                  <label key={a.key} className={styles.accessorialItem}>
+                    <input
+                      type="checkbox"
+                      checked={selectedAccessorials.has(a.key)}
+                      onChange={() => toggleAccessorial(a.key)}
+                    />
+                    <span>
+                      {a.label}
+                      {a.note && <span className={styles.accessorialNote}> ({a.note})</span>}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.divider} />
+
           <div className={styles.actions}>
-            <button
-              className={styles.btnPrimary}
-              disabled={!canContinue}
-              onClick={() => setStep('preview')}
-            >
+            <button className={styles.btnPrimary} disabled={!canContinue} onClick={() => setStep('preview')}>
               Continue to Preview →
             </button>
             {!canContinue && (
@@ -514,88 +517,49 @@ export default function QuoterPage() {
         </div>
       )}
 
-      {/* ── STEP 2: Preview ── */}
       {step === 'preview' && (
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>Step 2 — Review &amp; Submit</h2>
-          <div className={styles.batchBadge}>
-            Applying to all rows: <strong>{freightClass}</strong>
-          </div>
-          <p className={styles.hint}>
-            {parsedRows.length} shipment{parsedRows.length !== 1 ? 's' : ''} parsed. Make sure your Python worker is running before submitting.
-          </p>
+          <div className={styles.batchBadge}>Applying to all rows: <strong>{freightClass}</strong></div>
+          <p className={styles.hint}>{parsedRows.length} shipment{parsedRows.length !== 1 ? 's' : ''} parsed. Make sure your Python worker is running before submitting.</p>
           <ShipmentPreviewTable rows={parsedRows} />
           {submitError && <p className={styles.errorMsg}>{submitError}</p>}
           <div className={styles.actions}>
             <button className={styles.btnSecondary} onClick={() => setStep('upload')}>Back</button>
-            <button className={styles.btnPrimary} onClick={submitJob}>
-              Submit {parsedRows.length} Shipment{parsedRows.length !== 1 ? 's' : ''} to Queue
-            </button>
+            <button className={styles.btnPrimary} onClick={submitJob}>Submit {parsedRows.length} Shipment{parsedRows.length !== 1 ? 's' : ''} to Queue</button>
           </div>
         </div>
       )}
 
-      {/* ── STEP 3: Waiting ── */}
       {step === 'waiting' && (
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>Waiting for Worker…</h2>
-          <p className={styles.hint}>
-            Job <code className={styles.jobId}>{job?.id}</code> is in the queue.<br />
-            Start your Python worker if it's not running:
-          </p>
+          <p className={styles.hint}>Job <code className={styles.jobId}>{job?.id}</code> is in the queue.<br />Start your Python worker if it's not running:</p>
           <pre className={styles.codeBlock}>cd python && python worker.py</pre>
           <p className={styles.hint}>The page will update automatically once the worker picks it up.</p>
           <div className={styles.waitSpinnerRow}><span className={styles.spinner} /></div>
         </div>
       )}
 
-      {/* ── STEP 4: Running ── */}
       {step === 'running' && job && (
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>Quoting in Progress…</h2>
           <ProgressBar pct={pct} done={job.done_rows} total={job.total_rows} completed={completed} processing={quoteRows.filter((r) => r.status === 'processing').length} errors={errors} />
-          <PricingControls
-            marginPct={marginPct} minProfit={minProfit} maxProfit={maxProfit}
-            onMarginPct={setMarginPct} onMinProfit={setMinProfit} onMaxProfit={setMaxProfit}
-            rows={quoteRows}
-          />
+          <PricingControls marginPct={marginPct} minProfit={minProfit} maxProfit={maxProfit} onMarginPct={setMarginPct} onMinProfit={setMinProfit} onMaxProfit={setMaxProfit} rows={quoteRows} />
           <ResultsTable rows={quoteRows} marginPct={marginPct} minProfit={minProfit} maxProfit={maxProfit} />
         </div>
       )}
 
-      {/* ── STEP 5: Done ── */}
       {step === 'done' && job && (
         <div className={styles.card}>
           {job.status === 'error'
-            ? <>
-                <h2 className={`${styles.cardTitle} ${styles.errorTitle}`}>Worker Error</h2>
-                <p className={styles.errorMsg}>{job.error}</p>
-                <p className={styles.hint}>Check <code>python/screenshots/</code> for debug screenshots.</p>
-              </>
-            : <>
-                <h2 className={styles.cardTitle}>Done!</h2>
-                <div className={styles.summaryRow}>
-                  <div className={styles.summaryChip}><span className={styles.summaryNum}>{completed}</span> Quoted</div>
-                  {errors > 0 && <div className={`${styles.summaryChip} ${styles.summaryChipError}`}><span className={styles.summaryNum}>{errors}</span> Errors</div>}
-                </div>
-              </>}
-          <PricingControls
-            marginPct={marginPct} minProfit={minProfit} maxProfit={maxProfit}
-            onMarginPct={setMarginPct} onMinProfit={setMinProfit} onMaxProfit={setMaxProfit}
-            rows={quoteRows}
-          />
+            ? <><h2 className={`${styles.cardTitle} ${styles.errorTitle}`}>Worker Error</h2><p className={styles.errorMsg}>{job.error}</p><p className={styles.hint}>Check <code>python/screenshots/</code> for debug screenshots.</p></>
+            : <><h2 className={styles.cardTitle}>Done!</h2><div className={styles.summaryRow}><div className={styles.summaryChip}><span className={styles.summaryNum}>{completed}</span> Quoted</div>{errors > 0 && <div className={`${styles.summaryChip} ${styles.summaryChipError}`}><span className={styles.summaryNum}>{errors}</span> Errors</div>}</div></>}
+          <PricingControls marginPct={marginPct} minProfit={minProfit} maxProfit={maxProfit} onMarginPct={setMarginPct} onMinProfit={setMinProfit} onMaxProfit={setMaxProfit} rows={quoteRows} />
           <ResultsTable rows={quoteRows} marginPct={marginPct} minProfit={minProfit} maxProfit={maxProfit} />
           <div className={styles.actions}>
-            {quoteRows.length > 0 && (
-              <button className={styles.btnPrimary} onClick={() => downloadResults(quoteRows, quoteName, marginPct, minProfit, maxProfit)}>
-                Download Results (.xlsx)
-              </button>
-            )}
-            {errors > 0 && (
-              <button className={styles.btnSecondary} onClick={rerunErrors}>
-                ↺ Re-run {errors} Error{errors !== 1 ? 's' : ''}
-              </button>
-            )}
+            {quoteRows.length > 0 && <button className={styles.btnPrimary} onClick={() => downloadResults(quoteRows, quoteName, marginPct, minProfit, maxProfit)}>Download Results (.xlsx)</button>}
+            {errors > 0 && <button className={styles.btnSecondary} onClick={rerunErrors}>↺ Re-run {errors} Error{errors !== 1 ? 's' : ''}</button>}
             <button className={styles.btnSecondary} onClick={reset}>Start Over</button>
           </div>
         </div>
@@ -603,8 +567,6 @@ export default function QuoterPage() {
     </div>
   )
 }
-
-// ── Sub-components ─────────────────────────────────────────────────────────────────────────────
 
 function StepIndicator({ current }: { current: Step }) {
   const steps: { key: Step; label: string }[] = [
@@ -628,16 +590,12 @@ function StepIndicator({ current }: { current: Step }) {
 }
 
 function ProgressBar({ pct, done, total, completed, errors, processing }: { pct: number; done: number; total: number; completed: number; errors: number; processing: number }) {
-  const completedPct = (completed / total) * 100
-  const errorsPct = (errors / total) * 100
-  const processingPct = (processing / total) * 100
-
   return (
     <div className={styles.progressSection}>
       <div className={styles.progressBar}>
-        <div className={`${styles.progressFill} ${styles.progressComplete}`} style={{ width: `${completedPct}%` }} />
-        <div className={`${styles.progressFill} ${styles.progressError}`} style={{ width: `${errorsPct}%` }} />
-        <div className={`${styles.progressFill} ${styles.progressProcessing}`} style={{ width: `${processingPct}%` }} />
+        <div className={`${styles.progressFill} ${styles.progressComplete}`} style={{ width: `${(completed/total)*100}%` }} />
+        <div className={`${styles.progressFill} ${styles.progressError}`} style={{ width: `${(errors/total)*100}%` }} />
+        <div className={`${styles.progressFill} ${styles.progressProcessing}`} style={{ width: `${(processing/total)*100}%` }} />
       </div>
       <p className={styles.progressLabel}>{done} / {total} ({pct}%)</p>
       <div className={styles.progressStats}>
@@ -653,81 +611,33 @@ function ShipmentPreviewTable({ rows }: { rows: ShipmentRow[] }) {
   return (
     <div className={styles.tableWrapper}>
       <table className={styles.table}>
-        <thead>
-          <tr><th>#</th><th>Origin ZIP</th><th>Dest ZIP</th><th>Weight (lbs)</th></tr>
-        </thead>
-        <tbody>
-          {rows.slice(0, 50).map((r, i) => (
-            <tr key={i}>
-              <td>{i + 1}</td>
-              <td>{r.origin_zip}</td>
-              <td>{r.dest_zip}</td>
-              <td>{r.weight}</td>
-            </tr>
-          ))}
-        </tbody>
+        <thead><tr><th>#</th><th>Origin ZIP</th><th>Dest ZIP</th><th>Weight (lbs)</th></tr></thead>
+        <tbody>{rows.slice(0, 50).map((r, i) => <tr key={i}><td>{i+1}</td><td>{r.origin_zip}</td><td>{r.dest_zip}</td><td>{r.weight}</td></tr>)}</tbody>
       </table>
       {rows.length > 50 && <p className={styles.truncNote}>Showing first 50 of {rows.length} rows.</p>}
     </div>
   )
 }
 
-function PricingControls({
-  marginPct, minProfit, maxProfit, onMarginPct, onMinProfit, onMaxProfit, rows,
-}: {
-  marginPct: number; minProfit: number; maxProfit: number
-  onMarginPct: (v: number) => void; onMinProfit: (v: number) => void; onMaxProfit: (v: number) => void
-  rows: QuoteRow[]
-}) {
-  const totals = rows.reduce(
-    (acc, r) => {
-      const p = calcPricing(r.rate, marginPct, minProfit, maxProfit)
-      if (!p) return acc
-      return { cost: acc.cost + p.cost, sell: acc.sell + p.sellPrice, gp: acc.gp + p.gp, count: acc.count + 1 }
-    },
-    { cost: 0, sell: 0, gp: 0, count: 0 }
-  )
+function PricingControls({ marginPct, minProfit, maxProfit, onMarginPct, onMinProfit, onMaxProfit, rows }: { marginPct: number; minProfit: number; maxProfit: number; onMarginPct: (v: number) => void; onMinProfit: (v: number) => void; onMaxProfit: (v: number) => void; rows: QuoteRow[] }) {
+  const totals = rows.reduce((acc, r) => { const p = calcPricing(r.rate, marginPct, minProfit, maxProfit); return p ? { cost: acc.cost+p.cost, sell: acc.sell+p.sellPrice, gp: acc.gp+p.gp, count: acc.count+1 } : acc }, { cost:0, sell:0, gp:0, count:0 })
   return (
     <div className={styles.pricingPanel}>
       <div className={styles.pricingHeader}>Pricing Controls</div>
       <div className={styles.pricingInputRow}>
-        <div className={styles.pricingField}>
-          <label className={styles.pricingLabel}>Margin %</label>
-          <input className={styles.pricingInput} type="number" min={0} max={99} step={0.5}
-            value={marginPct} onChange={(e) => onMarginPct(parseFloat(e.target.value) || 0)} />
-        </div>
-        <div className={styles.pricingField}>
-          <label className={styles.pricingLabel}>Min Profit ($)</label>
-          <input className={styles.pricingInput} type="number" min={0} step={1}
-            value={minProfit} onChange={(e) => onMinProfit(parseFloat(e.target.value) || 0)} />
-        </div>
-        <div className={styles.pricingField}>
-          <label className={styles.pricingLabel}>Max Profit ($)</label>
-          <input className={styles.pricingInput} type="number" min={0} step={1}
-            value={maxProfit} onChange={(e) => onMaxProfit(parseFloat(e.target.value) || 0)} />
-        </div>
+        <div className={styles.pricingField}><label className={styles.pricingLabel}>Margin %</label><input className={styles.pricingInput} type="number" min={0} max={99} step={0.5} value={marginPct} onChange={(e) => onMarginPct(parseFloat(e.target.value)||0)} /></div>
+        <div className={styles.pricingField}><label className={styles.pricingLabel}>Min Profit ($)</label><input className={styles.pricingInput} type="number" min={0} step={1} value={minProfit} onChange={(e) => onMinProfit(parseFloat(e.target.value)||0)} /></div>
+        <div className={styles.pricingField}><label className={styles.pricingLabel}>Max Profit ($)</label><input className={styles.pricingInput} type="number" min={0} step={1} value={maxProfit} onChange={(e) => onMaxProfit(parseFloat(e.target.value)||0)} /></div>
       </div>
       {totals.count > 0 && (
         <div className={styles.gpSummaryBar}>
-          <div className={styles.gpStat}>
-            <span className={styles.gpStatNum}>{totals.count}</span>
-            <span className={styles.gpStatLbl}>Lanes Quoted</span>
-          </div>
+          <div className={styles.gpStat}><span className={styles.gpStatNum}>{totals.count}</span><span className={styles.gpStatLbl}>Lanes Quoted</span></div>
           <div className={styles.gpDivider} />
-          <div className={styles.gpStat}>
-            <span className={styles.gpStatNum}>{fmtMoney(totals.cost)}</span>
-            <span className={styles.gpStatLbl}>Total FFE Cost</span>
-          </div>
+          <div className={styles.gpStat}><span className={styles.gpStatNum}>{fmtMoney(totals.cost)}</span><span className={styles.gpStatLbl}>Total FFE Cost</span></div>
           <div className={styles.gpDivider} />
-          <div className={styles.gpStat}>
-            <span className={styles.gpStatNum}>{fmtMoney(totals.sell)}</span>
-            <span className={styles.gpStatLbl}>Total Sell Price</span>
-          </div>
+          <div className={styles.gpStat}><span className={styles.gpStatNum}>{fmtMoney(totals.sell)}</span><span className={styles.gpStatLbl}>Total Sell Price</span></div>
           <div className={styles.gpDivider} />
-          <div className={`${styles.gpStat} ${styles.gpStatHighlight}`}>
-            <span className={styles.gpStatNum}>{fmtMoney(totals.gp)}</span>
-            <span className={styles.gpStatLbl}>Total GP</span>
-          </div>
+          <div className={`${styles.gpStat} ${styles.gpStatHighlight}`}><span className={styles.gpStatNum}>{fmtMoney(totals.gp)}</span><span className={styles.gpStatLbl}>Total GP</span></div>
         </div>
       )}
     </div>
@@ -736,41 +646,28 @@ function PricingControls({
 
 function ResultsTable({ rows, marginPct, minProfit, maxProfit }: { rows: QuoteRow[]; marginPct: number; minProfit: number; maxProfit: number }) {
   const priced = rows.map((r) => ({ r, p: calcPricing(r.rate, marginPct, minProfit, maxProfit) }))
-  const totals = priced.reduce(
-    (acc, { p }) => p ? { cost: acc.cost + p.cost, sell: acc.sell + p.sellPrice, gp: acc.gp + p.gp, count: acc.count + 1 } : acc,
-    { cost: 0, sell: 0, gp: 0, count: 0 }
-  )
+  const totals = priced.reduce((acc, { p }) => p ? { cost: acc.cost+p.cost, sell: acc.sell+p.sellPrice, gp: acc.gp+p.gp, count: acc.count+1 } : acc, { cost:0, sell:0, gp:0, count:0 })
   return (
     <div className={styles.tableWrapper}>
       <table className={styles.table}>
-        <thead>
-          <tr>
-            <th>#</th><th>Origin</th><th>Dest</th><th>Weight</th><th>Status</th>
-            <th>FFE Cost</th><th>Sell Price</th><th>GP ($)</th>
-            <th>Transit</th><th>Quote #</th><th>Notes</th>
-          </tr>
-        </thead>
+        <thead><tr><th>#</th><th>Origin</th><th>Dest</th><th>Weight</th><th>Status</th><th>FFE Cost</th><th>Sell Price</th><th>GP ($)</th><th>Transit</th><th>Quote #</th><th>Notes</th></tr></thead>
         <tbody>
           {priced.map(({ r, p }) => (
-            <tr key={r.id || r.row_index} className={r.status === 'error' ? styles.rowError : r.status === 'complete' ? styles.rowComplete : ''}>
-              <td>{r.row_index}</td>
-              <td>{r.origin_zip}</td>
-              <td>{r.dest_zip}</td>
-              <td>{r.weight}</td>
+            <tr key={r.id||r.row_index} className={r.status==='error' ? styles.rowError : r.status==='complete' ? styles.rowComplete : ''}>
+              <td>{r.row_index}</td><td>{r.origin_zip}</td><td>{r.dest_zip}</td><td>{r.weight}</td>
               <td><StatusBadge status={r.status} /></td>
-              <td className={styles.rateCell}>{r.rate ?? '—'}</td>
-              <td className={styles.sellCell}>{p ? fmtMoney(p.sellPrice) : '—'}</td>
-              <td className={styles.gpCell}>{p ? fmtMoney(p.gp) : '—'}</td>
-              <td>{r.transit_days ?? '—'}</td>
-              <td>{r.quote_number ?? '—'}</td>
-              <td className={styles.notesCell}>{r.error ?? ''}</td>
+              <td className={styles.rateCell}>{r.rate??'—'}</td>
+              <td className={styles.sellCell}>{p?fmtMoney(p.sellPrice):'—'}</td>
+              <td className={styles.gpCell}>{p?fmtMoney(p.gp):'—'}</td>
+              <td>{r.transit_days??'—'}</td><td>{r.quote_number??'—'}</td>
+              <td className={styles.notesCell}>{r.error??''}</td>
             </tr>
           ))}
         </tbody>
         {totals.count > 0 && (
           <tfoot>
             <tr className={styles.totalsRow}>
-              <td colSpan={5} className={styles.totalsLabel}>Totals — {totals.count} lane{totals.count !== 1 ? 's' : ''}</td>
+              <td colSpan={5} className={styles.totalsLabel}>Totals — {totals.count} lane{totals.count!==1?'s':''}</td>
               <td className={styles.rateCell}>{fmtMoney(totals.cost)}</td>
               <td className={styles.sellCell}>{fmtMoney(totals.sell)}</td>
               <td className={styles.gpCell}>{fmtMoney(totals.gp)}</td>
