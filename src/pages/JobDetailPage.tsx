@@ -15,6 +15,9 @@ interface QuoteJob {
   created_at: string
   updated_at: string
   accessorials?: string[]
+  temperature?:  string
+  commodity?:    string
+  is_stackable?: boolean
 }
 
 interface QuoteRow {
@@ -27,11 +30,17 @@ interface QuoteRow {
   freight_class: string
   pieces?: number
   commodity?: string
+  pallets?: number
   status: 'pending' | 'processing' | 'complete' | 'error'
   rate?: string
   transit_days?: string
   quote_number?: string
   error?: string
+  freshx_rate?:    string
+  freshx_carrier?: string
+  winning_rate?:    string
+  winning_carrier?: string
+  winning_source?:  string
 }
 
 function fmtDate(iso: string) {
@@ -90,30 +99,34 @@ function fmtMoney(n: number) {
 
 function downloadXlsx(job: QuoteJob, rows: QuoteRow[], marginPct: number, minProfit: number, maxProfit: number) {
   const data = rows.map((r) => {
-    const p = calcPricing(r.rate, marginPct, minProfit, maxProfit)
+    const p = calcPricing(r.winning_rate ?? r.rate, marginPct, minProfit, maxProfit)
     return {
-      '#':            r.row_index,
-      'Origin ZIP':   r.origin_zip,
-      'Dest ZIP':     r.dest_zip,
-      'Weight (lbs)': r.weight,
-      'Class':        r.freight_class,
-      'Pieces':       r.pieces ?? '',
-      'Commodity':    r.commodity ?? '',
-      'FFE Cost':     r.rate ?? '',
-      'Sell Price':   p ? fmtMoney(p.sellPrice) : '',
-      'GP ($)':       p ? fmtMoney(p.gp) : '',
-      'Margin %':     p ? ((p.gp / p.sellPrice) * 100).toFixed(1) + '%' : '',
-      'Transit Days': r.transit_days ?? '',
-      'Quote #':      r.quote_number ?? '',
-      'Status':       r.status,
-      'Notes':        r.error ?? '',
+      '#':               r.row_index,
+      'Origin ZIP':      r.origin_zip,
+      'Dest ZIP':        r.dest_zip,
+      'Weight (lbs)':    r.weight,
+      'Pallets':         r.pallets ?? '',
+      'Class':           r.freight_class,
+      'FFE Cost':        r.rate ?? '',
+      'FreshX Rate':     r.freshx_rate ?? '',
+      'FreshX Carrier':  r.freshx_carrier ?? '',
+      'Winning Rate':    r.winning_rate ?? '',
+      'Winning Carrier': r.winning_carrier ?? '',
+      'Source':          r.winning_source ?? '',
+      'Sell Price':      p ? fmtMoney(p.sellPrice) : '',
+      'GP ($)':          p ? fmtMoney(p.gp) : '',
+      'Margin %':        p ? ((p.gp / p.sellPrice) * 100).toFixed(1) + '%' : '',
+      'Transit Days':    r.transit_days ?? '',
+      'Quote #':         r.quote_number ?? '',
+      'Status':          r.status,
+      'Notes':           r.error ?? '',
     }
   })
   const ws = XLSX.utils.json_to_sheet(data)
-  ws['!cols'] = [4, 12, 12, 14, 8, 8, 20, 14, 14, 12, 12, 14, 14, 10, 30].map((w) => ({ wch: w }))
+  ws['!cols'] = [4,12,12,14,8,8,14,14,18,14,18,8,14,12,12,14,14,10,30].map((w) => ({ wch: w }))
   const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, 'FFE Quotes')
-  const safe = (job.name?.trim() || 'FFE').replace(/[\/\\?%*:|"<>]/g, '-')
+  XLSX.utils.book_append_sheet(wb, ws, 'Reefer Quotes')
+  const safe = (job.name?.trim() || 'Quotes').replace(/[\/\\?%*:|"<>]/g, '-')
   XLSX.writeFile(wb, `${safe} Reefer Quotes.xlsx`)
 }
 
@@ -344,6 +357,15 @@ export default function JobDetailPage() {
           </div>
         )}
 
+        {(job_.temperature || job_.commodity) && (
+          <div className={styles.freshxRow}>
+            <span className={styles.freshxLbl}>FreshX:</span>
+            {job_.temperature && <span className={styles.freshxChip}>{job_.temperature}</span>}
+            {job_.commodity   && <span className={styles.freshxChip}>{job_.commodity}</span>}
+            <span className={styles.freshxChip}>{job_.is_stackable ? 'Stackable' : 'Not Stackable'}</span>
+          </div>
+        )}
+
         {(job_.status === 'running' || job_.status === 'pending') && (
           <div className={styles.progressSection}>
             <div className={styles.progressBar}>
@@ -363,7 +385,7 @@ export default function JobDetailPage() {
         </div>
       )}
 
-      {rows.some((r) => r.rate) && (
+      {rows.some((r) => r.rate || r.winning_rate) && (
         <PricingPanel
           marginPct={marginPct} minProfit={minProfit} maxProfit={maxProfit}
           onMarginPct={setMarginPct} onMinProfit={setMinProfit} onMaxProfit={setMaxProfit}
@@ -395,11 +417,15 @@ export default function JobDetailPage() {
                 <th>Origin ZIP</th>
                 <th>Dest ZIP</th>
                 <th>Weight</th>
+                <th>Pallets</th>
                 <th>Class</th>
-                <th>Pieces</th>
-                <th>Commodity</th>
                 <th>Status</th>
                 <th>FFE Cost</th>
+                <th>FreshX Rate</th>
+                <th>FreshX Carrier</th>
+                <th>Winning Rate</th>
+                <th>Carrier</th>
+                <th>Source</th>
                 <th>Sell Price</th>
                 <th>GP ($)</th>
                 <th>Transit Days</th>
@@ -409,13 +435,13 @@ export default function JobDetailPage() {
             </thead>
             <tbody>
               {filteredRows.map((r) => {
-                const p = calcPricing(r.rate, marginPct, minProfit, maxProfit)
+                const p = calcPricing(r.winning_rate ?? r.rate, marginPct, minProfit, maxProfit)
                 return (
                   <tr
                     key={r.id}
                     className={
-                      r.status === 'complete' ? styles.rowComplete :
-                      r.status === 'error'    ? styles.rowError    :
+                      r.status === 'complete'   ? styles.rowComplete   :
+                      r.status === 'error'      ? styles.rowError      :
                       r.status === 'processing' ? styles.rowProcessing : ''
                     }
                   >
@@ -423,11 +449,19 @@ export default function JobDetailPage() {
                     <td>{r.origin_zip}</td>
                     <td>{r.dest_zip}</td>
                     <td>{r.weight.toLocaleString()}</td>
+                    <td>{r.pallets ?? '—'}</td>
                     <td>{r.freight_class}</td>
-                    <td>{r.pieces ?? '—'}</td>
-                    <td className={styles.commodityCell}>{r.commodity ?? '—'}</td>
                     <td><RowBadge status={r.status} /></td>
                     <td className={styles.rateCell}>{r.rate ?? '—'}</td>
+                    <td className={styles.freshxCell}>{r.freshx_rate ?? '—'}</td>
+                    <td className={styles.freshxCell}>{r.freshx_carrier ?? '—'}</td>
+                    <td className={styles.winnerCell}>{r.winning_rate ?? '—'}</td>
+                    <td>{r.winning_carrier ?? '—'}</td>
+                    <td>
+                      {r.winning_source
+                        ? <span className={r.winning_source === 'FreshX' ? styles.sourceBadgeFreshx : styles.sourceBadgeFFE}>{r.winning_source}</span>
+                        : '—'}
+                    </td>
                     <td className={styles.sellCell}>{p ? fmtMoney(p.sellPrice) : '—'}</td>
                     <td className={styles.gpCell}>{p ? fmtMoney(p.gp) : '—'}</td>
                     <td>{r.transit_days ?? '—'}</td>
@@ -439,15 +473,24 @@ export default function JobDetailPage() {
             </tbody>
             {(() => {
               const totals = rows.reduce(
-                (acc, r) => { const p = calcPricing(r.rate, marginPct, minProfit, maxProfit); return p ? { cost: acc.cost + p.cost, sell: acc.sell + p.sellPrice, gp: acc.gp + p.gp, count: acc.count + 1 } : acc },
-                { cost: 0, sell: 0, gp: 0, count: 0 }
+                (acc, r) => {
+                  const ffeCost = r.rate ? (parseFloat(r.rate.replace(/[$,]/g, '')) || 0) : 0
+                  const p = calcPricing(r.winning_rate ?? r.rate, marginPct, minProfit, maxProfit)
+                  return p
+                    ? { ffeCost: acc.ffeCost + ffeCost, ffeCount: acc.ffeCount + (r.rate ? 1 : 0), winCost: acc.winCost + p.cost, sell: acc.sell + p.sellPrice, gp: acc.gp + p.gp, count: acc.count + 1 }
+                    : acc
+                },
+                { ffeCost: 0, ffeCount: 0, winCost: 0, sell: 0, gp: 0, count: 0 }
               )
               if (!totals.count) return null
               return (
                 <tfoot>
                   <tr className={styles.totalsRow}>
-                    <td colSpan={8} className={styles.totalsLabel}>Totals — {totals.count} lane{totals.count !== 1 ? 's' : ''}</td>
-                    <td className={styles.rateCell}>{fmtMoney(totals.cost)}</td>
+                    <td colSpan={7} className={styles.totalsLabel}>Totals — {totals.count} lane{totals.count !== 1 ? 's' : ''}</td>
+                    <td className={styles.rateCell}>{totals.ffeCount > 0 ? fmtMoney(totals.ffeCost) : '—'}</td>
+                    <td colSpan={2} />
+                    <td className={styles.winnerCell}>{fmtMoney(totals.winCost)}</td>
+                    <td colSpan={2} />
                     <td className={styles.sellCell}>{fmtMoney(totals.sell)}</td>
                     <td className={styles.gpCell}>{fmtMoney(totals.gp)}</td>
                     <td colSpan={3} />
@@ -470,7 +513,7 @@ function PricingPanel({
   rows: QuoteRow[]
 }) {
   const totals = rows.reduce(
-    (acc, r) => { const p = calcPricing(r.rate, marginPct, minProfit, maxProfit); return p ? { cost: acc.cost + p.cost, sell: acc.sell + p.sellPrice, gp: acc.gp + p.gp, count: acc.count + 1 } : acc },
+    (acc, r) => { const p = calcPricing(r.winning_rate ?? r.rate, marginPct, minProfit, maxProfit); return p ? { cost: acc.cost + p.cost, sell: acc.sell + p.sellPrice, gp: acc.gp + p.gp, count: acc.count + 1 } : acc },
     { cost: 0, sell: 0, gp: 0, count: 0 }
   )
   return (
@@ -502,7 +545,7 @@ function PricingPanel({
           <div className={styles.gpDivider} />
           <div className={styles.gpStat}>
             <span className={styles.gpStatNum}>{fmtMoney(totals.cost)}</span>
-            <span className={styles.gpStatLbl}>Total FFE Cost</span>
+            <span className={styles.gpStatLbl}>Total Buy Cost</span>
           </div>
           <div className={styles.gpDivider} />
           <div className={styles.gpStat}>
