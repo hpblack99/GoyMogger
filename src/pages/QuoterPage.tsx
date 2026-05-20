@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
 import { ACCESSORIALS } from '../lib/accessorials'
+import { FRESHX_TEMPERATURES, FRESHX_COMMODITIES } from '../lib/freshx'
 import styles from './QuoterPage.module.css'
 
-// ── FFE #Item1_ClassId options — exact labels from live DOM ─────────────────────
 const COMMODITY_OPTIONS = [
   'Animal Food - Not for Human Consumption',
   'Bakery Goods Less Than 12 Pounds Per Cubic Foot',
@@ -33,44 +33,55 @@ const CLASS_OPTIONS = [
   '110', '125', '150', '175', '200', '250', '300', '400', '500',
 ]
 
-// ── Types ──────────────────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────────────
 interface ShipmentRow {
   origin_zip: string
   dest_zip:   string
   weight:     number
+  pallets?:   number
 }
 
 interface QuoteRow {
-  id:           string
-  job_id:       string
-  row_index:    number
-  origin_zip:   string
-  dest_zip:     string
-  weight:       number
-  freight_class: string
-  status:       'pending' | 'processing' | 'complete' | 'error'
-  rate?:        string
-  transit_days?: string
-  quote_number?: string
-  error?:       string
+  id:              string
+  job_id:          string
+  row_index:       number
+  origin_zip:      string
+  dest_zip:        string
+  weight:          number
+  freight_class:   string
+  pallets?:        number
+  status:          'pending' | 'processing' | 'complete' | 'error'
+  rate?:           string
+  transit_days?:   string
+  quote_number?:   string
+  error?:          string
+  freshx_rate?:    string
+  freshx_carrier?: string
+  winning_rate?:    string
+  winning_carrier?: string
+  winning_source?:  string
 }
 
 interface QuoteJob {
-  id:         string
-  status:     'pending' | 'running' | 'complete' | 'error'
-  total_rows: number
-  done_rows:  number
-  error?:     string
-  created_at: string
+  id:            string
+  status:        'pending' | 'running' | 'complete' | 'error'
+  total_rows:    number
+  done_rows:     number
+  error?:        string
+  created_at:    string
+  temperature?:  string
+  commodity?:    string
+  is_stackable?: boolean
 }
 
 type Step = 'upload' | 'preview' | 'waiting' | 'running' | 'done'
 
-// ── Column detection — supports all common header variants ─────────────────────
+// ── Column detection ─────────────────────────────────────────────────────────────
 const COL_PATTERNS: Record<string, RegExp> = {
   origin_zip: /origin|from.?zip|shipper.?zip/i,
   dest_zip:   /dest(?:ination)?|to.?zip|consignee/i,
   weight:     /(?:gross\s+|total\s+)?weight|^wt$/i,
+  pallets:    /pallets?/i,
 }
 
 function padZip(z: string): string {
@@ -127,11 +138,16 @@ function parseXlsx(file: File): Promise<ShipmentRow[]> {
         const rows: ShipmentRow[] = raw
           .slice(1)
           .filter((r) => Array.isArray(r) && r.length && r[colIdx.origin_zip!])
-          .map((r) => ({
-            origin_zip: padZip(String(r[colIdx.origin_zip!] ?? '')),
-            dest_zip:   padZip(String(r[colIdx.dest_zip!]   ?? '')),
-            weight:     Number(r[colIdx.weight!]      ?? 0),
-          }))
+          .map((r) => {
+            const palletRaw = colIdx.pallets !== undefined ? r[colIdx.pallets] : undefined
+            const pallets = palletRaw !== undefined ? (parseInt(String(palletRaw), 10) || undefined) : undefined
+            return {
+              origin_zip: padZip(String(r[colIdx.origin_zip!] ?? '')),
+              dest_zip:   padZip(String(r[colIdx.dest_zip!]   ?? '')),
+              weight:     Number(r[colIdx.weight!] ?? 0),
+              pallets,
+            }
+          })
 
         resolve(rows)
       } catch (err) {
@@ -145,28 +161,34 @@ function parseXlsx(file: File): Promise<ShipmentRow[]> {
 
 function downloadResults(rows: QuoteRow[], companyName: string, marginPct: number, minProfit: number, maxProfit: number) {
   const data = rows.map((r) => {
-    const p = calcPricing(r.rate, marginPct, minProfit, maxProfit)
+    const p = calcPricing(r.winning_rate ?? r.rate, marginPct, minProfit, maxProfit)
     return {
-      '#':            r.row_index,
-      'Origin ZIP':   r.origin_zip,
-      'Dest ZIP':     r.dest_zip,
-      'Weight (lbs)': r.weight,
-      'Class':        r.freight_class,
-      'FFE Cost':     r.rate ?? '',
-      'Sell Price':   p ? fmtMoney(p.sellPrice) : '',
-      'GP ($)':       p ? fmtMoney(p.gp) : '',
-      'Margin %':     p ? ((p.gp / p.sellPrice) * 100).toFixed(1) + '%' : '',
-      'Transit Days': r.transit_days ?? '',
-      'Quote #':      r.quote_number ?? '',
-      'Status':       r.status,
-      'Notes':        r.error ?? '',
+      '#':               r.row_index,
+      'Origin ZIP':      r.origin_zip,
+      'Dest ZIP':        r.dest_zip,
+      'Weight (lbs)':    r.weight,
+      'Pallets':         r.pallets ?? '',
+      'Class':           r.freight_class,
+      'FFE Cost':        r.rate ?? '',
+      'FreshX Rate':     r.freshx_rate ?? '',
+      'FreshX Carrier':  r.freshx_carrier ?? '',
+      'Winning Rate':    r.winning_rate ?? '',
+      'Winning Carrier': r.winning_carrier ?? '',
+      'Source':          r.winning_source ?? '',
+      'Sell Price':      p ? fmtMoney(p.sellPrice) : '',
+      'GP ($)':          p ? fmtMoney(p.gp) : '',
+      'Margin %':        p ? ((p.gp / p.sellPrice) * 100).toFixed(1) + '%' : '',
+      'Transit Days':    r.transit_days ?? '',
+      'Quote #':         r.quote_number ?? '',
+      'Status':          r.status,
+      'Notes':           r.error ?? '',
     }
   })
   const ws = XLSX.utils.json_to_sheet(data)
-  ws['!cols'] = [4, 12, 12, 14, 10, 14, 14, 12, 12, 14, 14, 10, 30].map((w) => ({ wch: w }))
+  ws['!cols'] = [4,12,12,14,8,10,14,14,18,14,18,8,14,12,12,14,14,10,30].map((w) => ({ wch: w }))
   const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, 'FFE Quotes')
-  const safe = (companyName.trim() || 'FFE').replace(/[\/\\?%*:|"<>]/g, '-')
+  XLSX.utils.book_append_sheet(wb, ws, 'Reefer Quotes')
+  const safe = (companyName.trim() || 'Quotes').replace(/[\/\\?%*:|"<>]/g, '-')
   XLSX.writeFile(wb, `${safe} Reefer Quotes.xlsx`)
 }
 
@@ -181,7 +203,7 @@ function StatusBadge({ status }: { status: QuoteRow['status'] }) {
   return <span className={`${styles.badge} ${cls}`}>{label}</span>
 }
 
-// ── Main component ──────────────────────────────────────────────────────────────────────
+// ── Main component ────────────────────────────────────────────────────────────────
 export default function QuoterPage() {
   const [step, setStep]               = useState<Step>('upload')
   const [parsedRows, setParsedRows]   = useState<ShipmentRow[]>([])
@@ -192,9 +214,12 @@ export default function QuoterPage() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [isDragging, setIsDragging]   = useState(false)
   const [uploading, setUploading]     = useState(false)
-  const [freightClass, setFreightClass]             = useState('')
-  const [quoteName, setQuoteName]                   = useState('')
+  const [freightClass, setFreightClass]                 = useState('')
+  const [quoteName, setQuoteName]                       = useState('')
   const [selectedAccessorials, setSelectedAccessorials] = useState<Set<string>>(new Set())
+  const [temperature, setTemperature]   = useState('')
+  const [commodity, setCommodity]       = useState('')
+  const [isStackable, setIsStackable]   = useState(false)
   const [marginPct,  setMarginPct]      = useState(15)
   const [minProfit,  setMinProfit]      = useState(75)
   const [maxProfit,  setMaxProfit]      = useState(500)
@@ -209,7 +234,6 @@ export default function QuoterPage() {
     })
   }
 
-  // ── Handle file drop/select ───────────────────────────────────────────────────
   const handleFile = useCallback(async (file: File) => {
     setUploadError(null)
     setUploading(true)
@@ -218,7 +242,6 @@ export default function QuoterPage() {
       if (!rows.length) throw new Error('No valid data rows found.')
       setParsedRows(rows)
       setFileName(file.name)
-      // Stay on upload step — user must also select a class before continuing
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Failed to parse file')
     } finally {
@@ -239,7 +262,7 @@ export default function QuoterPage() {
     if (f) handleFile(f)
   }
 
-  // ── Submit job to Supabase ───────────────────────────────────────────────
+  // ── Submit job ────────────────────────────────────────────────────────────
   const submitJob = async () => {
     setSubmitError(null)
     if (!freightClass) {
@@ -247,30 +270,33 @@ export default function QuoterPage() {
       return
     }
     try {
-      // Try with all optional columns first; retry without each if migration not yet applied
       const jobPayload: Record<string, unknown> = {
         total_rows:   parsedRows.length,
         status:       'pending',
         name:         quoteName.trim() || null,
         accessorials: Array.from(selectedAccessorials),
+        temperature:  temperature || null,
+        commodity:    commodity || null,
+        is_stackable: isStackable,
       }
-      let { data: jobData, error: jobErr } = await supabase
-        .from('quote_jobs')
-        .insert(jobPayload)
-        .select()
-        .single()
 
+      let { data: jobData, error: jobErr } = await supabase
+        .from('quote_jobs').insert(jobPayload).select().single()
+
+      if (jobErr?.message && /temperature|commodity|is_stackable/i.test(jobErr.message)) {
+        delete jobPayload.temperature; delete jobPayload.commodity; delete jobPayload.is_stackable
+        const r = await supabase.from('quote_jobs').insert(jobPayload).select().single()
+        jobData = r.data; jobErr = r.error
+      }
       if (jobErr?.message?.includes('name')) {
         delete jobPayload.name
-        const retry = await supabase.from('quote_jobs').insert(jobPayload).select().single()
-        jobData = retry.data
-        jobErr  = retry.error
+        const r = await supabase.from('quote_jobs').insert(jobPayload).select().single()
+        jobData = r.data; jobErr = r.error
       }
       if (jobErr?.message?.includes('accessorials')) {
         delete jobPayload.accessorials
-        const retry = await supabase.from('quote_jobs').insert(jobPayload).select().single()
-        jobData = retry.data
-        jobErr  = retry.error
+        const r = await supabase.from('quote_jobs').insert(jobPayload).select().single()
+        jobData = r.data; jobErr = r.error
       }
       if (jobErr) throw jobErr
 
@@ -280,15 +306,24 @@ export default function QuoterPage() {
         origin_zip:    r.origin_zip,
         dest_zip:      r.dest_zip,
         weight:        r.weight,
+        pallets:       r.pallets ?? null,
         freight_class: freightClass,
         status:        'pending',
       }))
 
-      const { error: rowsErr } = await supabase.from('quote_rows').insert(rowInserts)
+      let { error: rowsErr } = await supabase.from('quote_rows').insert(rowInserts)
+      if (rowsErr?.message?.toLowerCase().includes('pallets')) {
+        const withoutPallets = rowInserts.map((r) => ({
+          job_id: r.job_id, row_index: r.row_index, origin_zip: r.origin_zip,
+          dest_zip: r.dest_zip, weight: r.weight, freight_class: r.freight_class, status: r.status,
+        }))
+        const retry = await supabase.from('quote_rows').insert(withoutPallets)
+        rowsErr = retry.error
+      }
       if (rowsErr) throw rowsErr
 
       setJob(jobData as QuoteJob)
-      setQuoteRows(rowInserts.map((r) => ({ ...r, id: '', status: 'pending' as const })))
+      setQuoteRows(rowInserts.map((r) => ({ ...r, id: '', status: 'pending' as const, pallets: r.pallets ?? undefined })))
       setStep('waiting')
     } catch (err: unknown) {
       const msg = (err as { message?: string })?.message ?? String(err)
@@ -296,11 +331,10 @@ export default function QuoterPage() {
     }
   }
 
-  // ── Real-time subscription + polling fallback ────────────────────────────────────────
+  // ── Realtime + polling ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!job?.id || step === 'upload' || step === 'preview' || step === 'done') return
 
-    // Fetch current state immediately in case worker already finished
     supabase.from('quote_rows').select('*').eq('job_id', job.id).order('row_index')
       .then(({ data }) => { if (data) setQuoteRows(data as QuoteRow[]) })
 
@@ -312,7 +346,6 @@ export default function QuoterPage() {
         else if (data.status === 'running') setStep('running')
       })
 
-    // Realtime channel
     const channel = supabase
       .channel(`job-${job.id}`)
       .on('postgres_changes',
@@ -334,8 +367,6 @@ export default function QuoterPage() {
 
     channelRef.current = channel
 
-    // Polling fallback — catches updates if realtime delivery lags.
-    // Also refreshes rows while running so per-row status updates in real-time.
     const poll = setInterval(async () => {
       const { data: jobData } = await supabase.from('quote_jobs').select('*').eq('id', job.id).single()
       if (!jobData) return
@@ -347,7 +378,6 @@ export default function QuoterPage() {
         clearInterval(poll)
       } else if (jobData.status === 'running') {
         setStep('running')
-        // Always re-fetch rows while running so complete/error/processing shows immediately
         const { data: rowData } = await supabase.from('quote_rows').select('*').eq('job_id', job.id).order('row_index')
         if (rowData) setQuoteRows(rowData as QuoteRow[])
       }
@@ -359,16 +389,18 @@ export default function QuoterPage() {
     }
   }, [job?.id, step === 'upload' || step === 'preview']) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Re-run error lanes ───────────────────────────────────────────────────────────
+  // ── Re-run errors ────────────────────────────────────────────────────────────
   const rerunErrors = async () => {
     if (!job) return
-    // Reset error rows + any stuck-processing rows from a prior crash
     const resetIds  = quoteRows.filter((r) => r.status === 'error' || r.status === 'processing').map((r) => r.id)
     const doneCount = quoteRows.filter((r) => r.status === 'complete').length
     if (!resetIds.length) return
     await Promise.all([
       supabase.from('quote_rows')
-        .update({ status: 'pending', rate: null, transit_days: null, quote_number: null, error: null })
+        .update({
+          status: 'pending', rate: null, transit_days: null, quote_number: null, error: null,
+          winning_rate: null, winning_carrier: null, winning_source: null,
+        })
         .in('id', resetIds),
       supabase.from('quote_jobs')
         .update({ status: 'pending', done_rows: doneCount, error: null })
@@ -376,7 +408,11 @@ export default function QuoterPage() {
     ])
     setQuoteRows((prev) =>
       prev.map((r) => (r.status === 'error' || r.status === 'processing')
-        ? { ...r, status: 'pending' as const, rate: undefined, transit_days: undefined, quote_number: undefined, error: undefined }
+        ? {
+            ...r, status: 'pending' as const,
+            rate: undefined, transit_days: undefined, quote_number: undefined, error: undefined,
+            winning_rate: undefined, winning_carrier: undefined, winning_source: undefined,
+          }
         : r
       )
     )
@@ -384,7 +420,7 @@ export default function QuoterPage() {
     setStep('waiting')
   }
 
-  // ── Reset ──────────────────────────────────────────────────────────────────────────────
+  // ── Reset ───────────────────────────────────────────────────────────────────
   const reset = () => {
     if (channelRef.current) supabase.removeChannel(channelRef.current)
     setStep('upload')
@@ -396,10 +432,13 @@ export default function QuoterPage() {
     setSubmitError(null)
     setQuoteName('')
     setSelectedAccessorials(new Set())
+    setTemperature('')
+    setCommodity('')
+    setIsStackable(false)
   }
 
-  const hasClass = freightClass !== ''
-  const hasFile  = parsedRows.length > 0
+  const hasClass    = freightClass !== ''
+  const hasFile     = parsedRows.length > 0
   const canContinue = hasClass && hasFile
 
   const pct       = job ? Math.round((job.done_rows / job.total_rows) * 100) : 0
@@ -409,9 +448,9 @@ export default function QuoterPage() {
   return (
     <div className={styles.page}>
       <div className={styles.header}>
-        <h1 className={styles.title}>FFE Reefer LTL Quote Bot</h1>
+        <h1 className={styles.title}>FFE + FreshX Reefer LTL Quote Bot</h1>
         <p className={styles.subtitle}>
-          Upload a spreadsheet → bid lands in Supabase → Python worker quotes each row → results appear live.
+          Upload a spreadsheet → both carriers quote each lane → winning rate lands in Supabase.
         </p>
         <StepIndicator current={step} />
       </div>
@@ -434,14 +473,12 @@ export default function QuoterPage() {
           </div>
           <div className={styles.divider} />
 
-          {/* ── 1a: Class selector ── */}
+          {/* 1a: Class */}
           <div className={`${styles.checkRow} ${hasClass ? styles.checkRowDone : ''}`}>
             <div className={styles.checkIcon}>{hasClass ? '✓' : '1'}</div>
             <div className={styles.checkBody}>
-              <label className={styles.classLabel}>
-                Freight Class / Commodity Type
-              </label>
-              <p className={styles.classHint}>Applies to every shipment in this batch.</p>
+              <label className={styles.classLabel}>Freight Class / Commodity Type</label>
+              <p className={styles.classHint}>Applies to every shipment in this batch (FFE).</p>
               <select
                 className={`${styles.select} ${!hasClass ? styles.selectEmpty : ''}`}
                 value={freightClass}
@@ -449,14 +486,10 @@ export default function QuoterPage() {
               >
                 <option value="">— Select class or commodity —</option>
                 <optgroup label="Commodity Type">
-                  {COMMODITY_OPTIONS.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
+                  {COMMODITY_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
                 </optgroup>
                 <optgroup label="Freight Class">
-                  {CLASS_OPTIONS.map((c) => (
-                    <option key={c} value={`Class ${c}`}>Class {c}</option>
-                  ))}
+                  {CLASS_OPTIONS.map((c) => <option key={c} value={`Class ${c}`}>Class {c}</option>)}
                 </optgroup>
               </select>
             </div>
@@ -464,16 +497,16 @@ export default function QuoterPage() {
 
           <div className={styles.divider} />
 
-          {/* ── 1b: File upload ── */}
+          {/* 1b: File */}
           <div className={`${styles.checkRow} ${hasFile ? styles.checkRowDone : ''}`}>
             <div className={styles.checkIcon}>{hasFile ? '✓' : '2'}</div>
             <div className={styles.checkBody}>
               <p className={styles.classLabel}>Shipment Spreadsheet</p>
               <p className={styles.classHint}>
                 Required columns: <code>Origin ZIP</code> · <code>Dest ZIP</code> · <code>Weight</code><br />
+                Optional: <code>Pallets</code> (used by FreshX)<br />
                 <span className={styles.colAliasInline}>Also: From Zip, To Zip, Gross Weight, etc.</span>
               </p>
-
               {hasFile ? (
                 <div className={styles.fileConfirm}>
                   <span className={styles.fileIcon}>📄</span>
@@ -482,9 +515,7 @@ export default function QuoterPage() {
                   <button
                     className={styles.changeFile}
                     onClick={() => { setParsedRows([]); setFileName(null); setUploadError(null); fileInputRef.current?.click() }}
-                  >
-                    Change
-                  </button>
+                  >Change</button>
                 </div>
               ) : (
                 <div
@@ -504,7 +535,6 @@ export default function QuoterPage() {
                       </>}
                 </div>
               )}
-
               <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" style={{ display: 'none' }} onChange={onFileInput} />
               {uploadError && <p className={styles.errorMsg}>{uploadError}</p>}
             </div>
@@ -512,7 +542,7 @@ export default function QuoterPage() {
 
           <div className={styles.divider} />
 
-          {/* ── 1c: Accessorials ── */}
+          {/* 1c: Accessorials */}
           <div className={styles.checkRow}>
             <div className={styles.checkIcon}>3</div>
             <div className={styles.checkBody}>
@@ -520,7 +550,7 @@ export default function QuoterPage() {
                 Accessorial Services
                 <span className={styles.optionalTag}>Optional</span>
               </label>
-              <p className={styles.classHint}>Select any that apply — applied to all lanes in this batch.</p>
+              <p className={styles.classHint}>Select any that apply — applied to all lanes (FFE only).</p>
               <div className={styles.accessorialGrid}>
                 {ACCESSORIALS.map((a) => (
                   <label key={a.key} className={styles.accessorialItem}>
@@ -535,6 +565,62 @@ export default function QuoterPage() {
                     </span>
                   </label>
                 ))}
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.divider} />
+
+          {/* 1d: FreshX */}
+          <div className={styles.checkRow}>
+            <div className={styles.checkIcon}>4</div>
+            <div className={styles.checkBody}>
+              <label className={styles.classLabel}>
+                FreshX Settings
+                <span className={styles.optionalTag}>Optional</span>
+              </label>
+              <p className={styles.classHint}>
+                Required to get FreshX rates alongside FFE. Skip to run FFE only.
+                Pallet count is read from the <code>Pallets</code> column in your spreadsheet.
+              </p>
+              <div className={styles.freshxSelectRow}>
+                <div className={styles.freshxSelectField}>
+                  <label className={styles.pricingLabel}>Temperature</label>
+                  <select
+                    className={`${styles.select} ${!temperature ? styles.selectEmpty : ''}`}
+                    value={temperature}
+                    onChange={(e) => setTemperature(e.target.value)}
+                  >
+                    <option value="">— None (FFE only) —</option>
+                    {FRESHX_TEMPERATURES.map((t) => (
+                      <option key={t.key} value={t.key}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles.freshxSelectField}>
+                  <label className={styles.pricingLabel}>Commodity</label>
+                  <select
+                    className={`${styles.select} ${!commodity ? styles.selectEmpty : ''}`}
+                    value={commodity}
+                    onChange={(e) => setCommodity(e.target.value)}
+                  >
+                    <option value="">— None (FFE only) —</option>
+                    {FRESHX_COMMODITIES.map((c) => (
+                      <option key={c.key} value={c.key}>{c.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles.freshxSelectField}>
+                  <label className={styles.pricingLabel}>Stackable</label>
+                  <select
+                    className={styles.select}
+                    value={isStackable ? 'yes' : 'no'}
+                    onChange={(e) => setIsStackable(e.target.value === 'yes')}
+                  >
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
@@ -565,7 +651,10 @@ export default function QuoterPage() {
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>Step 2 — Review &amp; Submit</h2>
           <div className={styles.batchBadge}>
-            Applying to all rows: <strong>{freightClass}</strong>
+            FFE class: <strong>{freightClass}</strong>
+            {temperature && <> · FreshX temp: <strong>{temperature}</strong></>}
+            {commodity && <> · <strong>{commodity}</strong></>}
+            {temperature && <> · Stackable: <strong>{isStackable ? 'Yes' : 'No'}</strong></>}
           </div>
           <p className={styles.hint}>
             {parsedRows.length} shipment{parsedRows.length !== 1 ? 's' : ''} parsed. Make sure your Python worker is running before submitting.
@@ -650,7 +739,7 @@ export default function QuoterPage() {
   )
 }
 
-// ── Sub-components ─────────────────────────────────────────────────────────────────────────────
+// ── Sub-components ────────────────────────────────────────────────────────────────
 
 function StepIndicator({ current }: { current: Step }) {
   const steps: { key: Step; label: string }[] = [
@@ -674,15 +763,14 @@ function StepIndicator({ current }: { current: Step }) {
 }
 
 function ProgressBar({ pct, done, total, completed, errors, processing }: { pct: number; done: number; total: number; completed: number; errors: number; processing: number }) {
-  const completedPct = (completed / total) * 100
-  const errorsPct = (errors / total) * 100
+  const completedPct  = (completed / total) * 100
+  const errorsPct     = (errors / total) * 100
   const processingPct = (processing / total) * 100
-
   return (
     <div className={styles.progressSection}>
       <div className={styles.progressBar}>
-        <div className={`${styles.progressFill} ${styles.progressComplete}`} style={{ width: `${completedPct}%` }} />
-        <div className={`${styles.progressFill} ${styles.progressError}`} style={{ width: `${errorsPct}%` }} />
+        <div className={`${styles.progressFill} ${styles.progressComplete}`}   style={{ width: `${completedPct}%` }} />
+        <div className={`${styles.progressFill} ${styles.progressError}`}      style={{ width: `${errorsPct}%` }} />
         <div className={`${styles.progressFill} ${styles.progressProcessing}`} style={{ width: `${processingPct}%` }} />
       </div>
       <p className={styles.progressLabel}>{done} / {total} ({pct}%)</p>
@@ -700,7 +788,7 @@ function ShipmentPreviewTable({ rows }: { rows: ShipmentRow[] }) {
     <div className={styles.tableWrapper}>
       <table className={styles.table}>
         <thead>
-          <tr><th>#</th><th>Origin ZIP</th><th>Dest ZIP</th><th>Weight (lbs)</th></tr>
+          <tr><th>#</th><th>Origin ZIP</th><th>Dest ZIP</th><th>Weight (lbs)</th><th>Pallets</th></tr>
         </thead>
         <tbody>
           {rows.slice(0, 50).map((r, i) => (
@@ -709,6 +797,7 @@ function ShipmentPreviewTable({ rows }: { rows: ShipmentRow[] }) {
               <td>{r.origin_zip}</td>
               <td>{r.dest_zip}</td>
               <td>{r.weight}</td>
+              <td>{r.pallets ?? '—'}</td>
             </tr>
           ))}
         </tbody>
@@ -727,7 +816,7 @@ function PricingControls({
 }) {
   const totals = rows.reduce(
     (acc, r) => {
-      const p = calcPricing(r.rate, marginPct, minProfit, maxProfit)
+      const p = calcPricing(r.winning_rate ?? r.rate, marginPct, minProfit, maxProfit)
       if (!p) return acc
       return { cost: acc.cost + p.cost, sell: acc.sell + p.sellPrice, gp: acc.gp + p.gp, count: acc.count + 1 }
     },
@@ -762,7 +851,7 @@ function PricingControls({
           <div className={styles.gpDivider} />
           <div className={styles.gpStat}>
             <span className={styles.gpStatNum}>{fmtMoney(totals.cost)}</span>
-            <span className={styles.gpStatLbl}>Total FFE Cost</span>
+            <span className={styles.gpStatLbl}>Total Buy Cost</span>
           </div>
           <div className={styles.gpDivider} />
           <div className={styles.gpStat}>
@@ -781,18 +870,32 @@ function PricingControls({
 }
 
 function ResultsTable({ rows, marginPct, minProfit, maxProfit }: { rows: QuoteRow[]; marginPct: number; minProfit: number; maxProfit: number }) {
-  const priced = rows.map((r) => ({ r, p: calcPricing(r.rate, marginPct, minProfit, maxProfit) }))
+  const priced = rows.map((r) => ({ r, p: calcPricing(r.winning_rate ?? r.rate, marginPct, minProfit, maxProfit) }))
   const totals = priced.reduce(
-    (acc, { p }) => p ? { cost: acc.cost + p.cost, sell: acc.sell + p.sellPrice, gp: acc.gp + p.gp, count: acc.count + 1 } : acc,
-    { cost: 0, sell: 0, gp: 0, count: 0 }
+    (acc, { r, p }) => {
+      const ffeCost = parseCost(r.rate)
+      return {
+        ffeCost:  acc.ffeCost  + (ffeCost ?? 0),
+        ffeCount: acc.ffeCount + (ffeCost !== null ? 1 : 0),
+        winCost:  acc.winCost  + (p ? p.cost : 0),
+        sell:     acc.sell     + (p ? p.sellPrice : 0),
+        gp:       acc.gp       + (p ? p.gp : 0),
+        count:    acc.count    + (p ? 1 : 0),
+      }
+    },
+    { ffeCost: 0, ffeCount: 0, winCost: 0, sell: 0, gp: 0, count: 0 }
   )
+
   return (
     <div className={styles.tableWrapper}>
       <table className={styles.table}>
         <thead>
           <tr>
             <th>#</th><th>Origin</th><th>Dest</th><th>Weight</th><th>Status</th>
-            <th>FFE Cost</th><th>Sell Price</th><th>GP ($)</th>
+            <th>FFE Cost</th>
+            <th>FreshX Rate</th><th>FreshX Carrier</th>
+            <th>Winning Rate</th><th>Carrier</th><th>Source</th>
+            <th>Sell Price</th><th>GP ($)</th>
             <th>Transit</th><th>Quote #</th><th>Notes</th>
           </tr>
         </thead>
@@ -805,6 +908,15 @@ function ResultsTable({ rows, marginPct, minProfit, maxProfit }: { rows: QuoteRo
               <td>{r.weight}</td>
               <td><StatusBadge status={r.status} /></td>
               <td className={styles.rateCell}>{r.rate ?? '—'}</td>
+              <td className={styles.freshxCell}>{r.freshx_rate ?? '—'}</td>
+              <td className={styles.freshxCell}>{r.freshx_carrier ?? '—'}</td>
+              <td className={styles.winnerCell}>{r.winning_rate ?? '—'}</td>
+              <td>{r.winning_carrier ?? '—'}</td>
+              <td>
+                {r.winning_source
+                  ? <span className={r.winning_source === 'FreshX' ? styles.sourceBadgeFreshx : styles.sourceBadgeFFE}>{r.winning_source}</span>
+                  : '—'}
+              </td>
               <td className={styles.sellCell}>{p ? fmtMoney(p.sellPrice) : '—'}</td>
               <td className={styles.gpCell}>{p ? fmtMoney(p.gp) : '—'}</td>
               <td>{r.transit_days ?? '—'}</td>
@@ -817,7 +929,10 @@ function ResultsTable({ rows, marginPct, minProfit, maxProfit }: { rows: QuoteRo
           <tfoot>
             <tr className={styles.totalsRow}>
               <td colSpan={5} className={styles.totalsLabel}>Totals — {totals.count} lane{totals.count !== 1 ? 's' : ''}</td>
-              <td className={styles.rateCell}>{fmtMoney(totals.cost)}</td>
+              <td className={styles.rateCell}>{totals.ffeCount > 0 ? fmtMoney(totals.ffeCost) : '—'}</td>
+              <td colSpan={2} />
+              <td className={styles.winnerCell}>{fmtMoney(totals.winCost)}</td>
+              <td colSpan={2} />
               <td className={styles.sellCell}>{fmtMoney(totals.sell)}</td>
               <td className={styles.gpCell}>{fmtMoney(totals.gp)}</td>
               <td colSpan={3} />
