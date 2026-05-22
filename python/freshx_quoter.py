@@ -359,73 +359,53 @@ class FreshXQuoter:
     def _download_results_csv(self, result_row, num_rows: int) -> dict[int, dict]:
         out_path = str(DOWNLOAD_DIR / f"freshx_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
 
-        dl_locator = result_row.locator(
-            "button[aria-haspopup='menu'], "
-            "button:has-text('Download'), a:has-text('Download'), "
-            "button:has-text('Export'), a:has-text('Export')"
-        ).first
+        dl_locator = result_row.locator("button[aria-haspopup='menu']").first
 
-        # ── Attempt 1: direct download (button triggers file directly) ──────────
+        # The Download button always opens a dropdown (never a direct download).
+        # Use force=True as fallback to bypass any backdrop overlay left from a
+        # previous menu open/close cycle.
         try:
-            with self.page.expect_download(timeout=6_000) as dl_info:
-                dl_locator.click()
-            dl_info.value.save_as(out_path)
-            print(f"[FreshX] Downloaded (direct): {out_path}")
-            return _parse_results_csv(out_path, num_rows)
+            dl_locator.click(timeout=10_000)
         except Exception:
-            pass  # no immediate download → try dropdown
+            dl_locator.click(force=True)
 
-        # ── Attempt 2: dropdown → pick CSV/Export option ─────────────────────────
-        dl_locator.click()
-        self.page.wait_for_timeout(1_000)
+        self.page.wait_for_timeout(800)
         _screenshot(self.page, "10-download-dropdown")
 
-        # Reka UI (Radix-based) dropdown items come first, then generic fallbacks
+        # Reka UI menu items — "Export CSV" is the exact text from the DOM.
         csv_selectors = [
+            "[role='menuitem']:has-text('Export CSV')",
+            "[data-reka-collection-item]:has-text('Export CSV')",
             "[role='menuitem']:has-text('CSV')",
+            "[data-reka-collection-item]:has-text('CSV')",
             "[role='menuitem']:has-text('Export')",
-            "[role='menuitem']:has-text('Download')",
-            "[role='option']:has-text('CSV')",
-            "li:has-text('CSV')",
-            "a:has-text('CSV')",
-            "button:has-text('CSV')",
-            "li:has-text('Export')",
-            "a:has-text('Export')",
-            "[data-value='csv']",
-            "[data-format='csv']",
             "[role='menuitem']",  # last resort: first visible menu item
         ]
 
-        clicked = False
         for sel in csv_selectors:
             try:
                 els = self.page.locator(sel).all()
                 for el in els:
                     try:
                         if el.is_visible(timeout=800):
-                            print(f"[FreshX] Clicking CSV option: {sel} → '{el.inner_text()}'")
+                            label = el.inner_text().strip()
+                            print(f"[FreshX] Clicking menu item: '{label}'")
                             with self.page.expect_download(timeout=30_000) as dl_info:
                                 el.click()
                             dl_info.value.save_as(out_path)
                             print(f"[FreshX] Downloaded: {out_path}")
-                            clicked = True
-                            break
+                            return _parse_results_csv(out_path, num_rows)
                     except Exception:
                         continue
-                if clicked:
-                    break
             except Exception:
                 continue
 
-        if not clicked:
-            _screenshot(self.page, "10-download-failed")
-            raise RuntimeError(
-                "FreshX: could not trigger CSV download. "
-                "Check python/screenshots/10-download-dropdown*.png to see what "
-                "the dropdown looks like and update freshx-config.json → csv_option."
-            )
-
-        return _parse_results_csv(out_path, num_rows)
+        _screenshot(self.page, "10-download-failed")
+        raise RuntimeError(
+            "FreshX: could not trigger CSV download. "
+            "Check python/screenshots/10-download-dropdown*.png to see what "
+            "the dropdown contains."
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
