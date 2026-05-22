@@ -292,7 +292,8 @@ class FreshXQuoter:
             except Exception:
                 continue
 
-        self.page.wait_for_load_state("networkidle", timeout=20_000)
+        self.page.wait_for_load_state("load", timeout=20_000)
+        self.page.wait_for_timeout(1_000)
         _screenshot(self.page, "07-after-upload-submit")
 
     # ─── Wait for result row ──────────────────────────────────────────────────
@@ -311,26 +312,31 @@ class FreshXQuoter:
             attempt += 1
             try:
                 rows = self.page.locator("table tbody tr").all()
-                for row in rows[:max(1, len(rows) - pre_count + 1)]:
-                    text = row.inner_text()
-                    has_download = False
-                    try:
-                        dl = row.locator(
-                            "button[aria-haspopup='menu'], "
-                            "button:has-text('Download'), a:has-text('Download')"
-                        ).first
-                        has_download = dl.is_visible()
-                    except Exception:
-                        pass
+                # Only look at rows that appeared after the upload; if none yet, keep waiting.
+                new_rows = rows[:max(0, len(rows) - pre_count)]
+                if not new_rows:
+                    print(f"[FreshX]   New row not yet in history ({len(rows)} rows currently)…")
+                else:
+                    for row in new_rows:
+                        text = row.inner_text()
+                        has_download = False
+                        try:
+                            dl = row.locator(
+                                "button[aria-haspopup='menu'], "
+                                "button:has-text('Download'), a:has-text('Download')"
+                            ).first
+                            has_download = dl.is_visible()
+                        except Exception:
+                            pass
 
-                    lanes_match = str(expected_lanes) in text
-                    if lanes_match and has_download:
-                        print(f"[FreshX] Results ready (attempt {attempt}). Row: {text[:80]}")
-                        _screenshot(self.page, "09-results-ready")
-                        return row
+                        lanes_match = str(expected_lanes) in text
+                        if lanes_match and has_download:
+                            print(f"[FreshX] Results ready (attempt {attempt}). Row: {text[:80]}")
+                            _screenshot(self.page, "09-results-ready")
+                            return row
 
-                    if lanes_match:
-                        print(f"[FreshX]   Row found but not ready yet: {text[:60]}")
+                        if lanes_match:
+                            print(f"[FreshX]   Row found but not ready yet: {text[:60]}")
 
             except Exception as e:
                 print(f"[FreshX]   Poll error (attempt {attempt}): {e}")
