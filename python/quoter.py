@@ -101,7 +101,7 @@ class FFEQuoter:
     def __enter__(self):
         self._playwright = sync_playwright().start()
         self._browser = self._playwright.chromium.launch(
-            headless=False,  # TODO: change back to `not self.debug` when done debugging
+            headless=not self.debug,
             slow_mo=300 if self.debug else 0,
         )
         self._context = self._browser.new_context(
@@ -171,7 +171,7 @@ class FFEQuoter:
 
         self._playwright = sync_playwright().start()
         self._browser = self._playwright.chromium.launch(
-            headless=False,  # TODO: change back to `not self.debug` when done debugging
+            headless=not self.debug,
             slow_mo=300 if self.debug else 0,
         )
         self._context = self._browser.new_context(

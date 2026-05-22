@@ -138,7 +138,10 @@ class FreshXQuoter:
 
         _screenshot(self.page, "02-credentials-filled")
         self.page.click(cfg["submit"])
-        self.page.wait_for_load_state("networkidle", timeout=20_000)
+        # Use "load" not "networkidle" — FreshX keeps background connections alive
+        # which means networkidle never fires.
+        self.page.wait_for_load_state("load", timeout=30_000)
+        self.page.wait_for_timeout(1_500)   # let JS finish post-login redirect
         _screenshot(self.page, "03-after-login")
 
         url = self.page.url.lower()
@@ -204,7 +207,7 @@ class FreshXQuoter:
 
         print("[FreshX] Navigating to bulk search page…")
         self.page.goto(CONFIG["urls"]["bulk_search"], wait_until="load", timeout=30_000)
-        self.page.wait_for_load_state("networkidle", timeout=15_000)
+        self.page.wait_for_timeout(1_000)
         _screenshot(self.page, "04-bulk-search-page")
 
         pre_count = self._count_history_rows()
@@ -281,7 +284,8 @@ class FreshXQuoter:
         if not uploaded:
             _try_click(self.page, cfg["submit_button"], timeout=5_000)
 
-        self.page.wait_for_load_state("networkidle", timeout=20_000)
+        self.page.wait_for_load_state("load", timeout=20_000)
+        self.page.wait_for_timeout(1_000)
         _screenshot(self.page, "07-after-upload-submit")
 
     # ─── Wait for result row ──────────────────────────────────────────────────
