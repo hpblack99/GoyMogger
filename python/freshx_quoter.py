@@ -76,11 +76,12 @@ class FreshXQuoter:
     def __enter__(self):
         self._playwright = sync_playwright().start()
         self._browser = self._playwright.chromium.launch(
-            headless=False,   # visible window — set to `not self.debug` once selectors are confirmed
-            slow_mo=300 if self.debug else 150,
+            headless=not self.debug,
+            slow_mo=300 if self.debug else 100,
+            args=["--start-maximized"],
         )
         self._context = self._browser.new_context(
-            viewport={"width": 1280, "height": 900},
+            no_viewport=True,   # let --start-maximized control the window size
             user_agent=(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -138,10 +139,7 @@ class FreshXQuoter:
 
         _screenshot(self.page, "02-credentials-filled")
         self.page.click(cfg["submit"])
-        # Use "load" not "networkidle" — FreshX keeps background connections alive
-        # which means networkidle never fires.
-        self.page.wait_for_load_state("load", timeout=30_000)
-        self.page.wait_for_timeout(1_500)   # let JS finish post-login redirect
+        self.page.wait_for_load_state("networkidle", timeout=20_000)
         _screenshot(self.page, "03-after-login")
 
         url = self.page.url.lower()
@@ -207,7 +205,7 @@ class FreshXQuoter:
 
         print("[FreshX] Navigating to bulk search page…")
         self.page.goto(CONFIG["urls"]["bulk_search"], wait_until="load", timeout=30_000)
-        self.page.wait_for_timeout(1_000)
+        self.page.wait_for_load_state("networkidle", timeout=15_000)
         _screenshot(self.page, "04-bulk-search-page")
 
         pre_count = self._count_history_rows()
@@ -240,49 +238,60 @@ class FreshXQuoter:
     def _upload_file(self, csv_path: str) -> None:
         cfg = CONFIG["bulk_search"]
 
-        # Click "Upload Bulk Search" button to open modal
-        if not _try_click(self.page, cfg["upload_trigger"], timeout=10_000):
-            _screenshot(self.page, "05-upload-trigger-missing")
-            raise RuntimeError(
-                "FreshX: could not find Upload Bulk Search button. "
-                "Update freshx-config.json → bulk_search → upload_trigger."
-            )
-        self.page.wait_for_timeout(800)
-        _screenshot(self.page, "05-upload-modal-open")
-
-        # Set file on the file input
-        try:
-            file_input = self.page.locator(cfg["file_input"]).first
-            file_input.set_input_files(csv_path)
-        except Exception as e:
-            _screenshot(self.page, "05-file-input-error")
-            raise RuntimeError(f"FreshX: could not set file on input: {e}")
-
-        self.page.wait_for_timeout(600)
-        _screenshot(self.page, "06-file-attached")
-
-        # Click the Upload submit button inside the modal
-        uploaded = False
-        for sel in [
-            "[role='dialog'] button:has-text('Upload')",
-            "dialog button:has-text('Upload')",
-            ".modal button:has-text('Upload')",
-            "button:has-text('Upload'):visible",
-        ]:
+        # Find the "Upload File" button
+        upload_btn = None
+        for sel in [s.strip() for s in cfg["upload_trigger"].split(",")]:
             try:
-                btns = self.page.locator(sel).all()
-                for btn in reversed(btns):
-                    if btn.is_visible():
-                        btn.click()
-                        uploaded = True
-                        break
-                if uploaded:
+                el = self.page.wait_for_selector(sel, timeout=10_000)
+                if el and el.is_visible():
+                    upload_btn = el
                     break
             except Exception:
                 continue
 
-        if not uploaded:
-            _try_click(self.page, cfg["submit_button"], timeout=5_000)
+        if upload_btn is None:
+            _screenshot(self.page, "05-upload-trigger-missing")
+            raise RuntimeError(
+                "FreshX: could not find Upload File button. "
+                "Update freshx-config.json → bulk_search → upload_trigger."
+            )
+
+        # Attempt 1: button opens native file picker — use expect_file_chooser
+        try:
+            with self.page.expect_file_chooser(timeout=5_000) as fc_info:
+                upload_btn.click()
+            fc_info.value.set_files(csv_path)
+            self.page.wait_for_timeout(1_000)
+            _screenshot(self.page, "06-file-set-via-chooser")
+        except Exception:
+            # Attempt 2: button may reveal a hidden input[type='file']
+            self.page.wait_for_timeout(500)
+            _screenshot(self.page, "05-upload-opened")
+            try:
+                file_input = self.page.locator(cfg["file_input"]).first
+                file_input.set_input_files(csv_path)
+                self.page.wait_for_timeout(600)
+                _screenshot(self.page, "06-file-attached")
+            except Exception as e:
+                _screenshot(self.page, "05-file-input-error")
+                raise RuntimeError(f"FreshX: could not set file on input: {e}")
+
+        # After file is set, look for a confirm/submit button (dialog or page)
+        for sel in [
+            "[role='dialog'] button:has-text('Upload')",
+            "[role='dialog'] button[type='submit']",
+            "button:has-text('Submit')",
+            "button:has-text('Start Search')",
+            "button:has-text('Run')",
+        ]:
+            try:
+                btns = self.page.locator(sel).all()
+                for btn in btns:
+                    if btn.is_visible():
+                        btn.click()
+                        break
+            except Exception:
+                continue
 
         self.page.wait_for_load_state("load", timeout=20_000)
         self.page.wait_for_timeout(1_000)
@@ -304,23 +313,31 @@ class FreshXQuoter:
             attempt += 1
             try:
                 rows = self.page.locator("table tbody tr").all()
-                for row in rows[:max(1, len(rows) - pre_count + 1)]:
-                    text = row.inner_text()
-                    has_download = False
-                    try:
-                        dl = row.locator("button:has-text('Download'), a:has-text('Download')").first
-                        has_download = dl.is_visible()
-                    except Exception:
-                        pass
+                # Only look at rows that appeared after the upload; if none yet, keep waiting.
+                new_rows = rows[:max(0, len(rows) - pre_count)]
+                if not new_rows:
+                    print(f"[FreshX]   New row not yet in history ({len(rows)} rows currently)…")
+                else:
+                    for row in new_rows:
+                        text = row.inner_text()
+                        has_download = False
+                        try:
+                            dl = row.locator(
+                                "button[aria-haspopup='menu'], "
+                                "button:has-text('Download'), a:has-text('Download')"
+                            ).first
+                            has_download = dl.is_visible()
+                        except Exception:
+                            pass
 
-                    lanes_match = str(expected_lanes) in text
-                    if lanes_match and has_download:
-                        print(f"[FreshX] Results ready (attempt {attempt}). Row: {text[:80]}")
-                        _screenshot(self.page, "09-results-ready")
-                        return row
+                        lanes_match = str(expected_lanes) in text
+                        if lanes_match and has_download:
+                            print(f"[FreshX] Results ready (attempt {attempt}). Row: {text[:80]}")
+                            _screenshot(self.page, "09-results-ready")
+                            return row
 
-                    if lanes_match:
-                        print(f"[FreshX]   Row found but not ready yet: {text[:60]}")
+                        if lanes_match:
+                            print(f"[FreshX]   Row found but not ready yet: {text[:60]}")
 
             except Exception as e:
                 print(f"[FreshX]   Poll error (attempt {attempt}): {e}")
@@ -330,7 +347,8 @@ class FreshXQuoter:
             time.sleep(RESULT_POLL_INTERVAL)
 
             try:
-                self.page.reload(wait_until="networkidle", timeout=20_000)
+                self.page.reload(wait_until="load", timeout=20_000)
+                self.page.wait_for_timeout(1_000)
                 _screenshot(self.page, f"09-poll-{attempt}")
             except Exception:
                 pass
@@ -342,71 +360,53 @@ class FreshXQuoter:
     def _download_results_csv(self, result_row, num_rows: int) -> dict[int, dict]:
         out_path = str(DOWNLOAD_DIR / f"freshx_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
 
-        dl_locator = result_row.locator(
-            "button:has-text('Download'), a:has-text('Download'), "
-            "button:has-text('Export'), a:has-text('Export')"
-        ).first
+        dl_locator = result_row.locator("button[aria-haspopup='menu']").first
 
-        # ── Attempt 1: direct download (button triggers file directly) ──────────
+        # The Download button always opens a dropdown (never a direct download).
+        # Use force=True as fallback to bypass any backdrop overlay left from a
+        # previous menu open/close cycle.
         try:
-            with self.page.expect_download(timeout=6_000) as dl_info:
-                dl_locator.click()
-            dl_info.value.save_as(out_path)
-            print(f"[FreshX] Downloaded (direct): {out_path}")
-            return _parse_results_csv(out_path, num_rows)
+            dl_locator.click(timeout=10_000)
         except Exception:
-            pass  # no immediate download → try dropdown
+            dl_locator.click(force=True)
 
-        # ── Attempt 2: dropdown → pick CSV/Export option ─────────────────────────
-        dl_locator.click()
-        self.page.wait_for_timeout(1_000)
+        self.page.wait_for_timeout(800)
         _screenshot(self.page, "10-download-dropdown")
 
-        # Broad list of selectors covering common dropdown patterns
+        # Reka UI menu items — "Export CSV" is the exact text from the DOM.
         csv_selectors = [
-            "li:has-text('CSV')",
-            "a:has-text('CSV')",
-            "button:has-text('CSV')",
+            "[role='menuitem']:has-text('Export CSV')",
+            "[data-reka-collection-item]:has-text('Export CSV')",
             "[role='menuitem']:has-text('CSV')",
-            "[role='option']:has-text('CSV')",
-            "li:has-text('Export')",
-            "a:has-text('Export')",
+            "[data-reka-collection-item]:has-text('CSV')",
             "[role='menuitem']:has-text('Export')",
-            "[data-value='csv']",
-            "[data-format='csv']",
-            "ul li",   # last resort: first item in any list that appeared
+            "[role='menuitem']",  # last resort: first visible menu item
         ]
 
-        clicked = False
         for sel in csv_selectors:
             try:
                 els = self.page.locator(sel).all()
                 for el in els:
                     try:
                         if el.is_visible(timeout=800):
-                            print(f"[FreshX] Clicking CSV option: {sel} → '{el.inner_text()}'")
+                            label = el.inner_text().strip()
+                            print(f"[FreshX] Clicking menu item: '{label}'")
                             with self.page.expect_download(timeout=30_000) as dl_info:
                                 el.click()
                             dl_info.value.save_as(out_path)
                             print(f"[FreshX] Downloaded: {out_path}")
-                            clicked = True
-                            break
+                            return _parse_results_csv(out_path, num_rows)
                     except Exception:
                         continue
-                if clicked:
-                    break
             except Exception:
                 continue
 
-        if not clicked:
-            _screenshot(self.page, "10-download-failed")
-            raise RuntimeError(
-                "FreshX: could not trigger CSV download. "
-                "Check python/screenshots/10-download-dropdown*.png to see what "
-                "the dropdown looks like and update freshx-config.json → csv_option."
-            )
-
-        return _parse_results_csv(out_path, num_rows)
+        _screenshot(self.page, "10-download-failed")
+        raise RuntimeError(
+            "FreshX: could not trigger CSV download. "
+            "Check python/screenshots/10-download-dropdown*.png to see what "
+            "the dropdown contains."
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -416,11 +416,12 @@ class FreshXQuoter:
 def _parse_results_csv(path: str, expected_rows: int) -> dict[int, dict]:
     """
     Parse the FreshX results CSV.
+    Multiple rows per lane (one per carrier quote) — keeps the cheapest.
     Returns { row_index: { 'freshx_rate': '$123.45'|None, 'freshx_carrier': 'Name'|None } }
     """
     cfg = CONFIG["results_csv"]
-    results: dict[int, dict] = {}
-    from_to_index: dict[tuple, int] = {}
+    # _best tracks (rate_as_float, rate_str, carrier) per row_index
+    _best: dict[int, tuple[float, str, str | None]] = {}
 
     try:
         with open(path, newline="", encoding="utf-8-sig") as f:
@@ -431,8 +432,6 @@ def _parse_results_csv(path: str, expected_rows: int) -> dict[int, dict]:
             id_col      = _find_col(headers, cfg["id_columns"])
             rate_col    = _find_col(headers, cfg["rate_columns"])
             carrier_col = _find_col(headers, cfg["carrier_columns"])
-            from_col    = _find_col(headers, cfg["from_columns"])
-            to_col      = _find_col(headers, cfg["to_columns"])
 
             print(f"[FreshX] Result CSV headers: {headers}")
             print(f"[FreshX] Mapped: id={id_col}, rate={rate_col}, carrier={carrier_col}")
@@ -440,30 +439,41 @@ def _parse_results_csv(path: str, expected_rows: int) -> dict[int, dict]:
             for raw_row in reader:
                 row = {k.lower().strip(): (v or "").strip() for k, v in raw_row.items()}
 
-                row_index: int | None = None
-                if id_col:
-                    ext_id = row.get(id_col, "")
-                    m = re.search(r"ROW_(\d+)", ext_id, re.IGNORECASE)
-                    if m:
-                        row_index = int(m.group(1))
+                if not id_col:
+                    continue
+                ext_id = row.get(id_col, "")
+                m = re.search(r"ROW_(\d+)", ext_id, re.IGNORECASE)
+                if not m:
+                    continue
+                row_index = int(m.group(1))
 
+                rate_val: float | None = None
                 rate_str: str | None = None
                 if rate_col:
-                    raw_rate = row.get(rate_col, "")
-                    m = re.search(r"\$?([\d,]+\.?\d*)", raw_rate)
-                    if m:
-                        rate_str = "$" + m.group(1).replace(",", "")
+                    raw_rate = row.get(rate_col, "").replace(",", "").replace("$", "").strip()
+                    try:
+                        rate_val = float(raw_rate)
+                        rate_str = f"${rate_val:,.2f}"
+                    except (ValueError, TypeError):
+                        pass  # "-" or empty → no quote for this carrier
 
-                carrier: str | None = row.get(carrier_col, "").strip() or None if carrier_col else None
+                carrier = (row.get(carrier_col, "").strip() or None) if carrier_col else None
 
-                if row_index is not None:
-                    results[row_index] = {"freshx_rate": rate_str, "freshx_carrier": carrier}
-                elif from_col and to_col:
-                    key = (row.get(from_col, ""), row.get(to_col, ""))
-                    from_to_index[key] = {"freshx_rate": rate_str, "freshx_carrier": carrier}  # type: ignore
+                if rate_val is None:
+                    # Record that we saw this lane even if no rate
+                    _best.setdefault(row_index, (float("inf"), None, None))  # type: ignore
+                    continue
+
+                existing = _best.get(row_index)
+                if existing is None or rate_val < existing[0]:
+                    _best[row_index] = (rate_val, rate_str, carrier)
 
     except Exception as e:
         print(f"[FreshX] Warning: could not parse results CSV ({path}): {e}")
 
-    print(f"[FreshX] Parsed {len(results)}/{expected_rows} rows by external_id.")
+    results: dict[int, dict] = {}
+    for idx, (_, rate_str, carrier) in _best.items():
+        results[idx] = {"freshx_rate": rate_str, "freshx_carrier": carrier}
+
+    print(f"[FreshX] Parsed {len(results)}/{expected_rows} rows (cheapest per lane).")
     return results
