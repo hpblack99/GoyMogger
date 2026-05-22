@@ -237,49 +237,60 @@ class FreshXQuoter:
     def _upload_file(self, csv_path: str) -> None:
         cfg = CONFIG["bulk_search"]
 
-        # Click "Upload Bulk Search" button to open modal
-        if not _try_click(self.page, cfg["upload_trigger"], timeout=10_000):
-            _screenshot(self.page, "05-upload-trigger-missing")
-            raise RuntimeError(
-                "FreshX: could not find Upload Bulk Search button. "
-                "Update freshx-config.json → bulk_search → upload_trigger."
-            )
-        self.page.wait_for_timeout(800)
-        _screenshot(self.page, "05-upload-modal-open")
-
-        # Set file on the file input
-        try:
-            file_input = self.page.locator(cfg["file_input"]).first
-            file_input.set_input_files(csv_path)
-        except Exception as e:
-            _screenshot(self.page, "05-file-input-error")
-            raise RuntimeError(f"FreshX: could not set file on input: {e}")
-
-        self.page.wait_for_timeout(600)
-        _screenshot(self.page, "06-file-attached")
-
-        # Click the Upload submit button inside the modal
-        uploaded = False
-        for sel in [
-            "[role='dialog'] button:has-text('Upload')",
-            "dialog button:has-text('Upload')",
-            ".modal button:has-text('Upload')",
-            "button:has-text('Upload'):visible",
-        ]:
+        # Find the "Upload File" button
+        upload_btn = None
+        for sel in [s.strip() for s in cfg["upload_trigger"].split(",")]:
             try:
-                btns = self.page.locator(sel).all()
-                for btn in reversed(btns):
-                    if btn.is_visible():
-                        btn.click()
-                        uploaded = True
-                        break
-                if uploaded:
+                el = self.page.wait_for_selector(sel, timeout=10_000)
+                if el and el.is_visible():
+                    upload_btn = el
                     break
             except Exception:
                 continue
 
-        if not uploaded:
-            _try_click(self.page, cfg["submit_button"], timeout=5_000)
+        if upload_btn is None:
+            _screenshot(self.page, "05-upload-trigger-missing")
+            raise RuntimeError(
+                "FreshX: could not find Upload File button. "
+                "Update freshx-config.json → bulk_search → upload_trigger."
+            )
+
+        # Attempt 1: button opens native file picker — use expect_file_chooser
+        try:
+            with self.page.expect_file_chooser(timeout=5_000) as fc_info:
+                upload_btn.click()
+            fc_info.value.set_files(csv_path)
+            self.page.wait_for_timeout(1_000)
+            _screenshot(self.page, "06-file-set-via-chooser")
+        except Exception:
+            # Attempt 2: button may reveal a hidden input[type='file']
+            self.page.wait_for_timeout(500)
+            _screenshot(self.page, "05-upload-opened")
+            try:
+                file_input = self.page.locator(cfg["file_input"]).first
+                file_input.set_input_files(csv_path)
+                self.page.wait_for_timeout(600)
+                _screenshot(self.page, "06-file-attached")
+            except Exception as e:
+                _screenshot(self.page, "05-file-input-error")
+                raise RuntimeError(f"FreshX: could not set file on input: {e}")
+
+        # After file is set, look for a confirm/submit button (dialog or page)
+        for sel in [
+            "[role='dialog'] button:has-text('Upload')",
+            "[role='dialog'] button[type='submit']",
+            "button:has-text('Submit')",
+            "button:has-text('Start Search')",
+            "button:has-text('Run')",
+        ]:
+            try:
+                btns = self.page.locator(sel).all()
+                for btn in btns:
+                    if btn.is_visible():
+                        btn.click()
+                        break
+            except Exception:
+                continue
 
         self.page.wait_for_load_state("networkidle", timeout=20_000)
         _screenshot(self.page, "07-after-upload-submit")
@@ -304,7 +315,10 @@ class FreshXQuoter:
                     text = row.inner_text()
                     has_download = False
                     try:
-                        dl = row.locator("button:has-text('Download'), a:has-text('Download')").first
+                        dl = row.locator(
+                            "button[aria-haspopup='menu'], "
+                            "button:has-text('Download'), a:has-text('Download')"
+                        ).first
                         has_download = dl.is_visible()
                     except Exception:
                         pass
@@ -326,7 +340,8 @@ class FreshXQuoter:
             time.sleep(RESULT_POLL_INTERVAL)
 
             try:
-                self.page.reload(wait_until="networkidle", timeout=20_000)
+                self.page.reload(wait_until="load", timeout=20_000)
+                self.page.wait_for_timeout(1_000)
                 _screenshot(self.page, f"09-poll-{attempt}")
             except Exception:
                 pass
@@ -336,30 +351,73 @@ class FreshXQuoter:
     # ─── Download + parse ─────────────────────────────────────────────────────
 
     def _download_results_csv(self, result_row, num_rows: int) -> dict[int, dict]:
-        cfg = CONFIG["bulk_search"]
+        out_path = str(DOWNLOAD_DIR / f"freshx_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
 
-        dl_btn = result_row.locator("button:has-text('Download'), a:has-text('Download')").first
-        dl_btn.click()
-        self.page.wait_for_timeout(600)
+        dl_locator = result_row.locator(
+            "button[aria-haspopup='menu'], "
+            "button:has-text('Download'), a:has-text('Download'), "
+            "button:has-text('Export'), a:has-text('Export')"
+        ).first
+
+        # ── Attempt 1: direct download (button triggers file directly) ──────────
+        try:
+            with self.page.expect_download(timeout=6_000) as dl_info:
+                dl_locator.click()
+            dl_info.value.save_as(out_path)
+            print(f"[FreshX] Downloaded (direct): {out_path}")
+            return _parse_results_csv(out_path, num_rows)
+        except Exception:
+            pass  # no immediate download → try dropdown
+
+        # ── Attempt 2: dropdown → pick CSV/Export option ─────────────────────────
+        dl_locator.click()
+        self.page.wait_for_timeout(1_000)
         _screenshot(self.page, "10-download-dropdown")
 
-        out_path = str(DOWNLOAD_DIR / f"freshx_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
-        try:
-            with self.page.expect_download(timeout=30_000) as dl_info:
-                for sel in cfg["csv_option"].split(","):
+        # Reka UI (Radix-based) dropdown items come first, then generic fallbacks
+        csv_selectors = [
+            "[role='menuitem']:has-text('CSV')",
+            "[role='menuitem']:has-text('Export')",
+            "[role='menuitem']:has-text('Download')",
+            "[role='option']:has-text('CSV')",
+            "li:has-text('CSV')",
+            "a:has-text('CSV')",
+            "button:has-text('CSV')",
+            "li:has-text('Export')",
+            "a:has-text('Export')",
+            "[data-value='csv']",
+            "[data-format='csv']",
+            "[role='menuitem']",  # last resort: first visible menu item
+        ]
+
+        clicked = False
+        for sel in csv_selectors:
+            try:
+                els = self.page.locator(sel).all()
+                for el in els:
                     try:
-                        el = self.page.locator(sel.strip()).first
-                        if el.is_visible(timeout=1_500):
-                            el.click()
+                        if el.is_visible(timeout=800):
+                            print(f"[FreshX] Clicking CSV option: {sel} → '{el.inner_text()}'")
+                            with self.page.expect_download(timeout=30_000) as dl_info:
+                                el.click()
+                            dl_info.value.save_as(out_path)
+                            print(f"[FreshX] Downloaded: {out_path}")
+                            clicked = True
                             break
                     except Exception:
                         continue
-            download = dl_info.value
-            download.save_as(out_path)
-            print(f"[FreshX] Downloaded: {out_path}")
-        except Exception as e:
-            _screenshot(self.page, "10-download-error")
-            raise RuntimeError(f"FreshX: download failed: {e}")
+                if clicked:
+                    break
+            except Exception:
+                continue
+
+        if not clicked:
+            _screenshot(self.page, "10-download-failed")
+            raise RuntimeError(
+                "FreshX: could not trigger CSV download. "
+                "Check python/screenshots/10-download-dropdown*.png to see what "
+                "the dropdown looks like and update freshx-config.json → csv_option."
+            )
 
         return _parse_results_csv(out_path, num_rows)
 

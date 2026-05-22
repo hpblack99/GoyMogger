@@ -11,11 +11,11 @@
     "error":    "[class*='error'], [class*='alert'], [role='alert']"
   },
   "bulk_search": {
-    "upload_trigger": "button:has-text('Upload'), button:has-text('Bulk Search'), button:has-text('New Search'), button:has-text('Upload Bulk')",
+    "upload_trigger": "button:has-text('Upload File'), button:has-text('Upload Bulk'), button:has-text('New Search'), button:has-text('Bulk Search'), button:has-text('Upload')",
     "file_input":     "input[type='file']",
     "submit_button":  "button:has-text('Upload')",
-    "download_button":"button:has-text('Download'), a:has-text('Download')",
-    "csv_option":     "li:has-text('CSV'), button:has-text('CSV'), a:has-text('CSV'), [data-value='csv'], [data-format='csv']"
+    "download_button":"button[aria-haspopup='menu'], button:has-text('Download'), a:has-text('Download')",
+    "csv_option":     "[role='menuitem']:has-text('CSV'), [role='menuitem']:has-text('Export'), li:has-text('CSV'), button:has-text('CSV'), a:has-text('CSV'), [data-value='csv'], [role='menuitem']"
   },
   "results_csv": {
     "rate_columns":    ["rate", "price", "total_price", "total_charge", "quoted_rate", "best_rate", "amount", "cost", "net_charge"],
