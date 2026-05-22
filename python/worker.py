@@ -18,6 +18,7 @@ import os
 import sys
 import time
 import signal
+import threading
 from datetime import datetime, timezone
 
 from dotenv import load_dotenv
@@ -184,19 +185,35 @@ def process_job(sb: Client, job: dict) -> None:
         }).eq("id", job_id).execute()
 
     try:
-        MasterQuoter(debug=DEBUG).run(
-            rows            = rows,
-            ffe_username    = FFE_USERNAME,
-            ffe_password    = FFE_PASSWORD,
-            freshx_username = FRESHX_USERNAME,
-            freshx_password = FRESHX_PASSWORD,
-            temperature     = job.get("temperature") or "",
-            commodity       = job.get("commodity") or "",
-            is_stackable    = bool(job.get("is_stackable", False)),
-            accessorials    = job.get("accessorials") or [],
-            on_row_start    = on_row_start,
-            on_row_done     = on_row_done,
-        )
+        # Run MasterQuoter in a plain thread so Playwright's sync API is not
+        # called from inside the asyncio event loop that supabase-py creates.
+        _exc: list[BaseException] = []
+
+        def _run():
+            try:
+                MasterQuoter(debug=DEBUG).run(
+                    rows            = rows,
+                    ffe_username    = FFE_USERNAME,
+                    ffe_password    = FFE_PASSWORD,
+                    freshx_username = FRESHX_USERNAME,
+                    freshx_password = FRESHX_PASSWORD,
+                    temperature     = job.get("temperature") or "",
+                    commodity       = job.get("commodity") or "",
+                    is_stackable    = bool(job.get("is_stackable", False)),
+                    accessorials    = job.get("accessorials") or [],
+                    on_row_start    = on_row_start,
+                    on_row_done     = on_row_done,
+                )
+            except BaseException as e:
+                _exc.append(e)
+
+        t = threading.Thread(target=_run, daemon=True)
+        t.start()
+        t.join()
+
+        if _exc:
+            raise _exc[0]
+
         finish_job(sb, job_id, done)
         print(f"[Worker] Job complete. {done}/{len(rows)} rows processed.")
 
