@@ -139,7 +139,8 @@ class FreshXQuoter:
 
         _screenshot(self.page, "02-credentials-filled")
         self.page.click(cfg["submit"])
-        self.page.wait_for_load_state("networkidle", timeout=20_000)
+        self.page.wait_for_load_state("load", timeout=30_000)
+        self.page.wait_for_timeout(1_500)
         _screenshot(self.page, "03-after-login")
 
         url = self.page.url.lower()
@@ -205,7 +206,8 @@ class FreshXQuoter:
 
         print("[FreshX] Navigating to bulk search page…")
         self.page.goto(CONFIG["urls"]["bulk_search"], wait_until="load", timeout=30_000)
-        self.page.wait_for_load_state("networkidle", timeout=15_000)
+        self.page.wait_for_timeout(1_000)
+        self.page.evaluate("window.scrollTo(0, 0)")
         _screenshot(self.page, "04-bulk-search-page")
 
         pre_count = self._count_history_rows()
@@ -349,6 +351,7 @@ class FreshXQuoter:
             try:
                 self.page.reload(wait_until="load", timeout=20_000)
                 self.page.wait_for_timeout(1_000)
+                self.page.evaluate("window.scrollTo(0, 0)")
                 _screenshot(self.page, f"09-poll-{attempt}")
             except Exception:
                 pass
@@ -361,6 +364,11 @@ class FreshXQuoter:
         out_path = str(DOWNLOAD_DIR / f"freshx_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
 
         dl_locator = result_row.locator("button[aria-haspopup='menu']").first
+
+        # Scroll to top so the dropdown menu opens within the viewport, not
+        # clipped by the bottom edge or obscured by a partially-scrolled page.
+        self.page.evaluate("window.scrollTo(0, 0)")
+        self.page.wait_for_timeout(300)
 
         # The Download button always opens a dropdown (never a direct download).
         # Use force=True as fallback to bypass any backdrop overlay left from a
