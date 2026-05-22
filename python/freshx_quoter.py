@@ -76,7 +76,7 @@ class FreshXQuoter:
     def __enter__(self):
         self._playwright = sync_playwright().start()
         self._browser = self._playwright.chromium.launch(
-            headless=not self.debug,
+            headless=False,
             slow_mo=300 if self.debug else 100,
             args=["--start-maximized"],
         )
