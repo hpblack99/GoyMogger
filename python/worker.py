@@ -19,6 +19,7 @@ import sys
 import time
 import signal
 import threading
+import traceback
 from datetime import datetime, timezone
 
 from dotenv import load_dotenv
@@ -189,6 +190,19 @@ def process_job(sb: Client, job: dict) -> None:
         # called from inside the asyncio event loop that supabase-py creates.
         _exc: list[BaseException] = []
 
+        # Normalize fields that Supabase may return as JSON booleans or nulls
+        raw_acc = job.get("accessorials")
+        if isinstance(raw_acc, list):
+            accessorials = [str(a) for a in raw_acc if isinstance(a, str)]
+        else:
+            accessorials = []
+
+        raw_stackable = job.get("is_stackable", False)
+        if isinstance(raw_stackable, str):
+            is_stackable = raw_stackable.strip().lower() in ("true", "1", "yes")
+        else:
+            is_stackable = bool(raw_stackable)
+
         def _run():
             try:
                 MasterQuoter(debug=DEBUG).run(
@@ -199,8 +213,8 @@ def process_job(sb: Client, job: dict) -> None:
                     freshx_password = FRESHX_PASSWORD,
                     temperature     = job.get("temperature") or "",
                     commodity       = job.get("commodity") or "",
-                    is_stackable    = bool(job.get("is_stackable", False)),
-                    accessorials    = job.get("accessorials") or [],
+                    is_stackable    = is_stackable,
+                    accessorials    = accessorials,
                     on_row_start    = on_row_start,
                     on_row_done     = on_row_done,
                 )
@@ -220,6 +234,7 @@ def process_job(sb: Client, job: dict) -> None:
     except Exception as exc:
         err = str(exc)
         print(f"[Worker] FAILED: {err}")
+        traceback.print_exc()
         if _is_network_error(err):
             print("[Worker] Network error — waiting 15s then re-queuing…")
             time.sleep(15)
