@@ -76,8 +76,8 @@ class FreshXQuoter:
     def __enter__(self):
         self._playwright = sync_playwright().start()
         self._browser = self._playwright.chromium.launch(
-            headless=not self.debug,
-            slow_mo=300 if self.debug else 100,
+            headless=False,   # visible window — set to `not self.debug` once selectors are confirmed
+            slow_mo=300 if self.debug else 150,
         )
         self._context = self._browser.new_context(
             viewport={"width": 1280, "height": 900},
@@ -340,30 +340,71 @@ class FreshXQuoter:
     # ─── Download + parse ─────────────────────────────────────────────────────
 
     def _download_results_csv(self, result_row, num_rows: int) -> dict[int, dict]:
-        cfg = CONFIG["bulk_search"]
+        out_path = str(DOWNLOAD_DIR / f"freshx_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
 
-        dl_btn = result_row.locator("button:has-text('Download'), a:has-text('Download')").first
-        dl_btn.click()
-        self.page.wait_for_timeout(600)
+        dl_locator = result_row.locator(
+            "button:has-text('Download'), a:has-text('Download'), "
+            "button:has-text('Export'), a:has-text('Export')"
+        ).first
+
+        # ── Attempt 1: direct download (button triggers file directly) ──────────
+        try:
+            with self.page.expect_download(timeout=6_000) as dl_info:
+                dl_locator.click()
+            dl_info.value.save_as(out_path)
+            print(f"[FreshX] Downloaded (direct): {out_path}")
+            return _parse_results_csv(out_path, num_rows)
+        except Exception:
+            pass  # no immediate download → try dropdown
+
+        # ── Attempt 2: dropdown → pick CSV/Export option ─────────────────────────
+        dl_locator.click()
+        self.page.wait_for_timeout(1_000)
         _screenshot(self.page, "10-download-dropdown")
 
-        out_path = str(DOWNLOAD_DIR / f"freshx_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
-        try:
-            with self.page.expect_download(timeout=30_000) as dl_info:
-                for sel in cfg["csv_option"].split(","):
+        # Broad list of selectors covering common dropdown patterns
+        csv_selectors = [
+            "li:has-text('CSV')",
+            "a:has-text('CSV')",
+            "button:has-text('CSV')",
+            "[role='menuitem']:has-text('CSV')",
+            "[role='option']:has-text('CSV')",
+            "li:has-text('Export')",
+            "a:has-text('Export')",
+            "[role='menuitem']:has-text('Export')",
+            "[data-value='csv']",
+            "[data-format='csv']",
+            "ul li",   # last resort: first item in any list that appeared
+        ]
+
+        clicked = False
+        for sel in csv_selectors:
+            try:
+                els = self.page.locator(sel).all()
+                for el in els:
                     try:
-                        el = self.page.locator(sel.strip()).first
-                        if el.is_visible(timeout=1_500):
-                            el.click()
+                        if el.is_visible(timeout=800):
+                            print(f"[FreshX] Clicking CSV option: {sel} → '{el.inner_text()}'")
+                            with self.page.expect_download(timeout=30_000) as dl_info:
+                                el.click()
+                            dl_info.value.save_as(out_path)
+                            print(f"[FreshX] Downloaded: {out_path}")
+                            clicked = True
                             break
                     except Exception:
                         continue
-            download = dl_info.value
-            download.save_as(out_path)
-            print(f"[FreshX] Downloaded: {out_path}")
-        except Exception as e:
-            _screenshot(self.page, "10-download-error")
-            raise RuntimeError(f"FreshX: download failed: {e}")
+                if clicked:
+                    break
+            except Exception:
+                continue
+
+        if not clicked:
+            _screenshot(self.page, "10-download-failed")
+            raise RuntimeError(
+                "FreshX: could not trigger CSV download. "
+                "Check python/screenshots/10-download-dropdown*.png to see what "
+                "the dropdown looks like and update freshx-config.json → csv_option."
+            )
 
         return _parse_results_csv(out_path, num_rows)
 
