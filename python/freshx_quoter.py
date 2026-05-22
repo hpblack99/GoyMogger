@@ -78,9 +78,10 @@ class FreshXQuoter:
         self._browser = self._playwright.chromium.launch(
             headless=not self.debug,
             slow_mo=300 if self.debug else 100,
+            args=["--start-maximized"],
         )
         self._context = self._browser.new_context(
-            viewport={"width": 1280, "height": 900},
+            no_viewport=True,   # let --start-maximized control the window size
             user_agent=(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -415,11 +416,12 @@ class FreshXQuoter:
 def _parse_results_csv(path: str, expected_rows: int) -> dict[int, dict]:
     """
     Parse the FreshX results CSV.
+    Multiple rows per lane (one per carrier quote) — keeps the cheapest.
     Returns { row_index: { 'freshx_rate': '$123.45'|None, 'freshx_carrier': 'Name'|None } }
     """
     cfg = CONFIG["results_csv"]
-    results: dict[int, dict] = {}
-    from_to_index: dict[tuple, int] = {}
+    # _best tracks (rate_as_float, rate_str, carrier) per row_index
+    _best: dict[int, tuple[float, str, str | None]] = {}
 
     try:
         with open(path, newline="", encoding="utf-8-sig") as f:
@@ -430,8 +432,6 @@ def _parse_results_csv(path: str, expected_rows: int) -> dict[int, dict]:
             id_col      = _find_col(headers, cfg["id_columns"])
             rate_col    = _find_col(headers, cfg["rate_columns"])
             carrier_col = _find_col(headers, cfg["carrier_columns"])
-            from_col    = _find_col(headers, cfg["from_columns"])
-            to_col      = _find_col(headers, cfg["to_columns"])
 
             print(f"[FreshX] Result CSV headers: {headers}")
             print(f"[FreshX] Mapped: id={id_col}, rate={rate_col}, carrier={carrier_col}")
@@ -439,30 +439,41 @@ def _parse_results_csv(path: str, expected_rows: int) -> dict[int, dict]:
             for raw_row in reader:
                 row = {k.lower().strip(): (v or "").strip() for k, v in raw_row.items()}
 
-                row_index: int | None = None
-                if id_col:
-                    ext_id = row.get(id_col, "")
-                    m = re.search(r"ROW_(\d+)", ext_id, re.IGNORECASE)
-                    if m:
-                        row_index = int(m.group(1))
+                if not id_col:
+                    continue
+                ext_id = row.get(id_col, "")
+                m = re.search(r"ROW_(\d+)", ext_id, re.IGNORECASE)
+                if not m:
+                    continue
+                row_index = int(m.group(1))
 
+                rate_val: float | None = None
                 rate_str: str | None = None
                 if rate_col:
-                    raw_rate = row.get(rate_col, "")
-                    m = re.search(r"\$?([\d,]+\.?\d*)", raw_rate)
-                    if m:
-                        rate_str = "$" + m.group(1).replace(",", "")
+                    raw_rate = row.get(rate_col, "").replace(",", "").replace("$", "").strip()
+                    try:
+                        rate_val = float(raw_rate)
+                        rate_str = f"${rate_val:,.2f}"
+                    except (ValueError, TypeError):
+                        pass  # "-" or empty → no quote for this carrier
 
-                carrier: str | None = row.get(carrier_col, "").strip() or None if carrier_col else None
+                carrier = (row.get(carrier_col, "").strip() or None) if carrier_col else None
 
-                if row_index is not None:
-                    results[row_index] = {"freshx_rate": rate_str, "freshx_carrier": carrier}
-                elif from_col and to_col:
-                    key = (row.get(from_col, ""), row.get(to_col, ""))
-                    from_to_index[key] = {"freshx_rate": rate_str, "freshx_carrier": carrier}  # type: ignore
+                if rate_val is None:
+                    # Record that we saw this lane even if no rate
+                    _best.setdefault(row_index, (float("inf"), None, None))  # type: ignore
+                    continue
+
+                existing = _best.get(row_index)
+                if existing is None or rate_val < existing[0]:
+                    _best[row_index] = (rate_val, rate_str, carrier)
 
     except Exception as e:
         print(f"[FreshX] Warning: could not parse results CSV ({path}): {e}")
 
-    print(f"[FreshX] Parsed {len(results)}/{expected_rows} rows by external_id.")
+    results: dict[int, dict] = {}
+    for idx, (_, rate_str, carrier) in _best.items():
+        results[idx] = {"freshx_rate": rate_str, "freshx_carrier": carrier}
+
+    print(f"[FreshX] Parsed {len(results)}/{expected_rows} rows (cheapest per lane).")
     return results
