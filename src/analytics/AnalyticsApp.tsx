@@ -63,12 +63,14 @@ export default function AnalyticsApp() {
   const location = useLocation()
   const isUpload = location.pathname.endsWith('/upload')
 
-  const [allLoads, setAllLoads] = useState<Load[]>([])
-  const [loading, setLoading]   = useState(true)
-  const [filters, setFilters]   = useState<AnalyticsFilters>(defaultFilters)
+  const [allLoads, setAllLoads]       = useState<Load[]>([])
+  const [loading, setLoading]         = useState(true)
+  const [loadedCount, setLoadedCount] = useState(0)
+  const [filters, setFilters]         = useState<AnalyticsFilters>(defaultFilters)
 
   const load = async () => {
     setLoading(true)
+    setLoadedCount(0)
     const PAGE = 1000
     const all: Load[] = []
     let from = 0
@@ -80,6 +82,7 @@ export default function AnalyticsApp() {
         .range(from, from + PAGE - 1)
       if (error || !data || data.length === 0) break
       all.push(...(data as Load[]))
+      setLoadedCount(all.length)
       if (data.length < PAGE) break
       from += PAGE
     }
@@ -115,6 +118,17 @@ export default function AnalyticsApp() {
 
   return (
     <Ctx.Provider value={{ allLoads, filteredLoads, filters, setFilters, loading, reload: load }}>
+      {loading && (
+        <div className={styles.loadingOverlay}>
+          <div className={styles.loadingBox}>
+            <div className={styles.loadingSpinner} />
+            <div className={styles.loadingTitle}>Loading freight data…</div>
+            {loadedCount > 0 && (
+              <div className={styles.loadingCount}>{loadedCount.toLocaleString()} loads fetched</div>
+            )}
+          </div>
+        </div>
+      )}
       <div className={styles.shell}>
         {/* Sidebar */}
         <aside className={styles.sidebar}>
@@ -152,9 +166,6 @@ export default function AnalyticsApp() {
             </div>
           )}
           <main className={styles.main}>
-            {loading && !isUpload && (
-              <div className={styles.loadingBar}>Loading data…</div>
-            )}
             <Routes>
               <Route index element={<Navigate to="overview" replace />} />
               <Route path="upload"         element={<UploadPage />} />
