@@ -5,7 +5,7 @@ export default function Navbar() {
   const { pathname } = useLocation()
 
   const active = (path: string) =>
-    pathname === path || (path !== '/' && pathname.startsWith(path))
+    pathname === path || (path !== '/reefer' && pathname.startsWith(path))
       ? styles.active
       : ''
 
@@ -13,16 +13,16 @@ export default function Navbar() {
     <header className={styles.header}>
       <nav className={styles.nav}>
         <Link to="/" className={styles.logo}>
-          FFE Quote Bot
+          ReeferByHank
         </Link>
         <div className={styles.links}>
-          <Link to="/" className={`${styles.link} ${active('/')}`}>
+          <Link to="/reefer" className={`${styles.link} ${active('/reefer')}`}>
             Dashboard
           </Link>
-          <Link to="/jobs" className={`${styles.link} ${active('/jobs')}`}>
+          <Link to="/reefer/jobs" className={`${styles.link} ${active('/reefer/jobs')}`}>
             Bids
           </Link>
-          <Link to="/quoter" className={`${styles.link} ${styles.linkCta} ${active('/quoter')}`}>
+          <Link to="/reefer/quoter" className={`${styles.link} ${styles.linkCta} ${active('/reefer/quoter')}`}>
             + New Bid
           </Link>
         </div>
