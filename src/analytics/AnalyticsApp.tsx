@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useMemo } from 'react'
 import { Routes, Route, NavLink, useLocation, Navigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../auth/AuthGate'
 import type { Load, AnalyticsFilters } from './lib/types'
 import FilterBar from './components/FilterBar'
 import UploadPage from './pages/UploadPage'
@@ -12,6 +13,9 @@ import MarginLeakagePage from './pages/MarginLeakagePage'
 import ChargePage from './pages/ChargePage'
 import DiscountPage from './pages/DiscountPage'
 import AlertsPage from './pages/AlertsPage'
+import BrainstormPage from './pages/BrainstormPage'
+import ReportsPage from './pages/ReportsPage'
+import ReportEditorPage from './pages/ReportEditorPage'
 import ChatBot from './chat/ChatBot'
 import styles from './AnalyticsApp.module.css'
 
@@ -41,6 +45,9 @@ const NAV = [
   { to: '/analytics/charges',        label: 'Charges',          icon: '⊞' },
   { to: '/analytics/discounts',      label: 'Discounts',        icon: '⊟' },
   { to: '/analytics/alerts',         label: 'Alerts',           icon: '◎' },
+  null, // divider
+  { to: '/analytics/brainstorm',     label: 'Brainstorm',       icon: '✦' },
+  { to: '/analytics/reports',        label: 'Reports',          icon: '⊡' },
 ]
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -61,8 +68,10 @@ function defaultFilters(): AnalyticsFilters {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function AnalyticsApp() {
+  const { user } = useAuth()
   const location = useLocation()
   const isUpload = location.pathname.endsWith('/upload')
+  const isFullPage = ['/brainstorm', '/reports'].some(p => location.pathname.includes(p))
 
   const [allLoads, setAllLoads]       = useState<Load[]>([])
   const [loading, setLoading]         = useState(true)
@@ -150,24 +159,32 @@ export default function AnalyticsApp() {
             <a href="/" className={styles.backLink}>← HankNet</a>
           </div>
           <nav className={styles.sideNav}>
-            {NAV.map(n => (
-              <NavLink
-                key={n.to}
-                to={n.to}
-                className={({ isActive }) =>
-                  `${styles.navItem} ${isActive ? styles.navActive : ''}`
-                }
-              >
-                <span className={styles.navIcon}>{n.icon}</span>
-                {n.label}
-              </NavLink>
-            ))}
+            {NAV.map((n, i) =>
+              n === null ? (
+                <div key={`div-${i}`} className={styles.navDivider} />
+              ) : (
+                <NavLink
+                  key={n.to}
+                  to={n.to}
+                  className={({ isActive }) =>
+                    `${styles.navItem} ${isActive ? styles.navActive : ''}`
+                  }
+                >
+                  <span className={styles.navIcon}>{n.icon}</span>
+                  {n.label}
+                </NavLink>
+              )
+            )}
           </nav>
+          <div className={styles.sidebarFooter}>
+            <span className={styles.userEmail}>{user.email}</span>
+            <button className={styles.logoutBtn} onClick={() => supabase.auth.signOut()}>Sign out</button>
+          </div>
         </aside>
 
         {/* Content */}
         <div className={styles.content}>
-          {!isUpload && (
+          {!isUpload && !isFullPage && (
             <div className={styles.filterWrap}>
               <FilterBar
                 filters={filters}
@@ -178,7 +195,7 @@ export default function AnalyticsApp() {
               />
             </div>
           )}
-          <main className={styles.main}>
+          <main className={isFullPage ? styles.mainFull : styles.main}>
             <Routes>
               <Route index element={<Navigate to="overview" replace />} />
               <Route path="upload"         element={<UploadPage />} />
@@ -190,6 +207,9 @@ export default function AnalyticsApp() {
               <Route path="charges"        element={<ChargePage />} />
               <Route path="discounts"      element={<DiscountPage />} />
               <Route path="alerts"         element={<AlertsPage />} />
+              <Route path="brainstorm"     element={<BrainstormPage />} />
+              <Route path="reports"        element={<ReportsPage />} />
+              <Route path="reports/:id"    element={<ReportEditorPage />} />
             </Routes>
           </main>
         </div>

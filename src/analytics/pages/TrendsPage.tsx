@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  ComposedChart, Bar, Line, AreaChart, Area,
+  ComposedChart, Bar, Line,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend
 } from 'recharts'
 import { useAnalytics } from '../AnalyticsApp'

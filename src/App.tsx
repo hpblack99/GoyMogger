@@ -5,6 +5,7 @@ import QuoterPage from './pages/QuoterPage'
 import JobsPage from './pages/JobsPage'
 import JobDetailPage from './pages/JobDetailPage'
 import AnalyticsApp from './analytics/AnalyticsApp'
+import AuthGate from './auth/AuthGate'
 
 export default function App() {
   return (
@@ -16,7 +17,7 @@ export default function App() {
         <Route path="jobs" element={<JobsPage />} />
         <Route path="jobs/:id" element={<JobDetailPage />} />
       </Route>
-      <Route path="/analytics/*" element={<AnalyticsApp />} />
+      <Route path="/analytics/*" element={<AuthGate><AnalyticsApp /></AuthGate>} />
     </Routes>
   )
 }

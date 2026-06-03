@@ -10,7 +10,7 @@ const COLORS = ['#22c55e', '#06b6d4', '#f59e0b', '#a78bfa', '#f472b6', '#fb923c'
 const axisTick = { fontSize: 10, fill: '#6e7681' }
 const tooltipStyle = { background: '#161b22', border: '1px solid #21262d', borderRadius: 8 }
 
-export function ChatChart({ spec }: { spec: ChartSpec }) {
+export function ChatChart({ spec, height = 220 }: { spec: ChartSpec; height?: number }) {
   const { type, xKey, series, data } = spec
   if (!data?.length || !series?.length) return null
 
@@ -26,7 +26,7 @@ export function ChatChart({ spec }: { spec: ChartSpec }) {
 
   return (
     <div className={styles.vizBox}>
-      <ResponsiveContainer width="100%" height={220}>
+      <ResponsiveContainer width="100%" height={height}>
         {type === 'line' ? (
           <LineChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
             {common}

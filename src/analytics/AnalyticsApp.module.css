@@ -89,6 +89,15 @@
 .main {
   padding: 20px 24px 40px;
   flex: 1;
+  overflow-y: auto;
+}
+
+.mainFull {
+  padding: 0;
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .loadingOverlay {
@@ -137,3 +146,39 @@
   color: var(--color-primary-600);
   font-weight: 500;
 }
+
+.navDivider {
+  height: 1px;
+  background: var(--color-neutral-200);
+  margin: 6px 8px;
+}
+
+.sidebarFooter {
+  margin-top: auto;
+  padding: 12px 16px;
+  border-top: 1px solid var(--color-neutral-200);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.userEmail {
+  font-size: 0.72rem;
+  color: var(--color-neutral-500);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logoutBtn {
+  background: none;
+  border: 1px solid var(--color-neutral-300);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 0.75rem;
+  color: var(--color-neutral-500);
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.15s, border-color 0.15s;
+}
+.logoutBtn:hover { color: #f85149; border-color: #f85149; }
