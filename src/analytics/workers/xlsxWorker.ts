@@ -67,15 +67,24 @@ const DATE_FIELDS = new Set([
   'scheduled_delivery_date', 'actual_delivery_date',
 ])
 
-function parseRow(raw: Record<string, unknown>): Record<string, unknown> {
+// Normalize a header: lowercase, strip spaces/underscores/hyphens
+function normalize(s: string) { return s.toLowerCase().replace(/[\s_\-]/g, '') }
+
+// Build a lookup: normalized Excel header → db column name
+const NORMALIZED_MAP: Record<string, string> = {}
+for (const [k, v] of Object.entries(COL_MAP)) {
+  NORMALIZED_MAP[normalize(k)] = v
+}
+
+function parseRow(raw: Record<string, unknown>, headerMap: Record<string, string>): Record<string, unknown> {
   const out: Record<string, unknown> = {}
-  for (const [xlsxKey, dbKey] of Object.entries(COL_MAP)) {
-    const val = raw[xlsxKey]
+  for (const [rawKey, dbKey] of Object.entries(headerMap)) {
+    const val = raw[rawKey]
     if (val === undefined || val === null || val === '') {
       out[dbKey] = null
       continue
     }
-    if (DATE_FIELDS.has(dbKey)) {
+    if (DATE_FIELDS.has(dbKey as string)) {
       if (val instanceof Date) {
         out[dbKey] = val.toISOString().slice(0, 10)
       } else {
@@ -113,11 +122,21 @@ self.onmessage = (e: MessageEvent<ArrayBuffer>) => {
       return
     }
 
-    // Extract header row (row 0)
+    // Extract header row (row 0) and build a runtime map: raw header → db column
     const headers: string[] = []
+    const headerMap: Record<string, string> = {} // rawHeader → dbKey
     for (let c = range.s.c; c <= range.e.c; c++) {
       const cell = ws[XLSX.utils.encode_cell({ r: 0, c })]
-      headers.push(cell ? String(cell.v) : `col_${c}`)
+      const h = cell ? String(cell.v).trim() : `col_${c}`
+      headers.push(h)
+      const dbKey = NORMALIZED_MAP[normalize(h)]
+      if (dbKey) headerMap[h] = dbKey
+    }
+
+    const mappedCount = Object.keys(headerMap).length
+    if (mappedCount === 0) {
+      self.postMessage({ type: 'error', message: `No recognized column headers found. First few headers: ${headers.slice(0, 5).join(', ')}` })
+      return
     }
 
     self.postMessage({ type: 'start', total: totalRows })
@@ -131,7 +150,7 @@ self.onmessage = (e: MessageEvent<ArrayBuffer>) => {
         defval: null,
       })
 
-      const rows = raw.map(parseRow).filter(r => r['invoice_num'])
+      const rows = raw.map(r => parseRow(r, headerMap)).filter(r => r['invoice_num'])
       self.postMessage({ type: 'batch', rows, processed: endRow })
     }
 
