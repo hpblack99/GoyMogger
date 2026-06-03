@@ -1,0 +1,105 @@
+import { supabase } from '../../lib/supabase'
+import { buildSqlPrompt, buildInterpretPrompt } from './prompts'
+
+const PA_URL: string = import.meta.env.VITE_PA_CHAT_URL ?? ''
+
+export interface ChartSpec {
+  type: 'line' | 'bar' | 'area' | 'pie'
+  xKey: string
+  series: { key: string; label?: string; color?: string }[]
+  data: Record<string, unknown>[]
+}
+
+export interface TableSpec {
+  columns: string[]
+  rows: (string | number | null)[][]
+}
+
+export interface AssistantResult {
+  answer: string
+  chart: ChartSpec | null
+  table: TableSpec | null
+  sql?: string
+}
+
+// Strip ```json fences and parse, tolerating extra prose around the JSON.
+function extractJson<T>(raw: string): T {
+  let s = raw.trim()
+  // Remove markdown code fences
+  s = s.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim()
+  // If there's leading/trailing prose, grab the outermost {...}
+  const first = s.indexOf('{')
+  const last = s.lastIndexOf('}')
+  if (first > 0 || last < s.length - 1) {
+    if (first !== -1 && last !== -1) s = s.slice(first, last + 1)
+  }
+  return JSON.parse(s) as T
+}
+
+// Call the single Power Automate flow with a prompt string, return the AI text.
+async function runPrompt(prompt: string): Promise<string> {
+  if (!PA_URL) {
+    throw new Error('Chat is not configured. Set VITE_PA_CHAT_URL in your .env to the Power Automate flow URL.')
+  }
+  const res = await fetch(PA_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt }),
+  })
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`Power Automate returned ${res.status}. ${body.slice(0, 200)}`)
+  }
+
+  // PA Response shape varies — accept a raw string or common JSON wrappers.
+  const ct = res.headers.get('content-type') ?? ''
+  if (!ct.includes('application/json')) {
+    return (await res.text()).trim()
+  }
+  const json = await res.json()
+  if (typeof json === 'string') return json
+  return (
+    json.result ?? json.text ?? json.output ?? json.answer ??
+    json.response ?? json.body ?? JSON.stringify(json)
+  )
+}
+
+// Full round trip: question -> SQL -> data -> interpreted answer.
+export async function askAssistant(
+  question: string,
+  history: string,
+  onStage?: (stage: string) => void,
+): Promise<AssistantResult> {
+  // Phase 1 — generate SQL
+  onStage?.('Thinking…')
+  const sqlRaw = await runPrompt(buildSqlPrompt(question, history))
+  let sql: string
+  try {
+    sql = extractJson<{ sql: string }>(sqlRaw).sql
+  } catch {
+    sql = sqlRaw.trim() // model may have returned bare SQL
+  }
+  if (!sql || !/^\s*select/i.test(sql)) {
+    throw new Error(`The assistant did not return a valid query.\n\n${sqlRaw.slice(0, 300)}`)
+  }
+
+  // Phase 2 — execute SQL via the safe read-only DB function
+  onStage?.('Querying data…')
+  const { data, error } = await supabase.rpc('chat_query', { query: sql })
+  if (error) {
+    throw new Error(`Query failed: ${error.message}\n\nSQL:\n${sql}`)
+  }
+  const rows = (data as unknown[]) ?? []
+
+  // Phase 3 — interpret the result
+  onStage?.('Interpreting…')
+  const interpRaw = await runPrompt(buildInterpretPrompt(question, sql, rows))
+  let result: AssistantResult
+  try {
+    result = extractJson<AssistantResult>(interpRaw)
+  } catch {
+    result = { answer: interpRaw.trim(), chart: null, table: null }
+  }
+  result.sql = sql
+  return result
+}

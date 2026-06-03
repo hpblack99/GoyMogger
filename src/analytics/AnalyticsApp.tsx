@@ -12,6 +12,7 @@ import MarginLeakagePage from './pages/MarginLeakagePage'
 import ChargePage from './pages/ChargePage'
 import DiscountPage from './pages/DiscountPage'
 import AlertsPage from './pages/AlertsPage'
+import ChatBot from './chat/ChatBot'
 import styles from './AnalyticsApp.module.css'
 
 // ── Context ──────────────────────────────────────────────────────────────────
@@ -193,6 +194,9 @@ export default function AnalyticsApp() {
           </main>
         </div>
       </div>
+
+      {/* Floating AI assistant — persists across all analytics pages */}
+      <ChatBot />
     </Ctx.Provider>
   )
 }
