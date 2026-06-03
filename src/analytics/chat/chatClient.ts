@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabase'
-import { buildSqlPrompt, buildInterpretPrompt } from './prompts'
+import { buildSqlPrompt, buildSqlRetryPrompt, buildInterpretPrompt } from './prompts'
 
 // Route through the Supabase edge function proxy to avoid CORS on Power Automate
 const PROXY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/pa-chat-proxy`
@@ -91,9 +91,20 @@ export async function askAssistant(
   }
   assertReadOnly(sql)
 
-  // Phase 2 — execute SQL via the safe read-only DB function
+  // Phase 2 — execute SQL via the safe read-only DB function (auto-retry once on error)
   onStage?.('Querying data…')
-  const { data, error } = await supabase.rpc('chat_query', { query: sql })
+  let { data, error } = await supabase.rpc('chat_query', { query: sql })
+  if (error) {
+    onStage?.('Fixing query…')
+    const fixedRaw = await runPrompt(buildSqlRetryPrompt(question, sql, error.message))
+    let fixedSql: string
+    try { fixedSql = extractJson<{ sql: string }>(fixedRaw).sql } catch { fixedSql = fixedRaw.trim() }
+    assertReadOnly(fixedSql)
+    sql = fixedSql
+    const retry = await supabase.rpc('chat_query', { query: sql })
+    data = retry.data
+    error = retry.error
+  }
   if (error) {
     throw new Error(`Query failed: ${error.message}\n\nSQL:\n${sql}`)
   }

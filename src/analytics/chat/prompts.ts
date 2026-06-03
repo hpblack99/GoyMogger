@@ -24,8 +24,13 @@ TABLE load_charges (charge detail rows, many per invoice):
   invoice_num text (-> loads.invoice_num), type text, description text,
   units numeric, unit_rate numeric, subtotal numeric, charge_category text
 
-NOTES:
-- margin % = load_profit / load_revenue * 100
+POSTGRES RULES (important):
+- date - date returns INTEGER days, NOT an interval. Use it directly as a number.
+  WRONG: EXTRACT(DAY FROM CURRENT_DATE - some_date)
+  RIGHT: (CURRENT_DATE - some_date) -- already an integer
+- To convert integer days to years: days / 365.0
+- For interval arithmetic use INTERVAL: e.g. CURRENT_DATE - INTERVAL '90 days'
+- margin % = load_profit / NULLIF(load_revenue, 0) * 100
 - Use ILIKE '%term%' for fuzzy text matching (names vary in casing).
 - "discount" = quote_orig_rev - load_revenue (when positive).
 - Dates are ISO (YYYY-MM-DD). Filter booked_date for time ranges.
@@ -51,6 +56,28 @@ RULES:
 
 Respond with ONLY a JSON object, no markdown fences:
 {"sql": "<the SELECT statement>"}`
+}
+
+export function buildSqlRetryPrompt(question: string, badSql: string, dbError: string): string {
+  return `You are a PostgreSQL analyst. Your previous query failed with an error. Fix it.
+
+Original question: "${question}"
+
+Failed SQL:
+${badSql}
+
+Database error:
+${dbError}
+
+${DB_SCHEMA}
+
+POSTGRES RULES:
+- date - date returns INTEGER days directly, not an interval. Never use EXTRACT(DAY FROM date - date).
+- Use (date_col - other_date_col) as a plain integer for day counts.
+- To annualize: integer_days / 365.0
+
+Return ONLY a corrected JSON object, no markdown:
+{"sql": "<fixed SELECT statement>"}`
 }
 
 export function buildInterpretPrompt(question: string, sql: string, data: unknown[]): string {
