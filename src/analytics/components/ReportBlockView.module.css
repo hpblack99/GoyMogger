@@ -44,6 +44,15 @@
 
 .danger:hover { color: #f85149; border-color: #f8514940; background: rgba(248,81,73,0.08); }
 
+.question {
+  padding: 8px 16px;
+  font-size: 0.78rem;
+  color: #484f58;
+  border-bottom: 1px solid #21262d;
+  font-style: italic;
+  background: #0d1117;
+}
+
 .content { padding: 18px; }
 
 .loading {

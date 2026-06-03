@@ -31,8 +31,12 @@ export default function ReportBlockView({ block, canEdit, onMoveUp, onMoveDown, 
         setChartSpec({ type: cfg.chartType, xKey: cfg.xKey, series: cfg.series, data: dbRows })
       } else if (block.block_type === 'table') {
         const cfg = block.config as TableBlockConfig
-        const tableRows = dbRows.map(r => cfg.columnKeys.map(k => (r[k] ?? null) as string | number | null))
-        setTableSpec({ columns: cfg.columns, rows: tableRows })
+        // Use actual SQL result keys (positional), not stored display labels
+        const keys = dbRows.length > 0 ? Object.keys(dbRows[0]) : cfg.columnKeys
+        const tableRows = dbRows.map(r => keys.map(k => (r[k] ?? null) as string | number | null))
+        // Use stored display columns if count matches, otherwise fall back to raw keys
+        const columns = cfg.columns.length === keys.length ? cfg.columns : keys
+        setTableSpec({ columns, rows: tableRows })
       }
     })
   }, [block.id, block.sql_query, block.block_type, block.config])
@@ -53,11 +57,15 @@ export default function ReportBlockView({ block, canEdit, onMoveUp, onMoveDown, 
         setChartSpec({ type: cfg.chartType, xKey: cfg.xKey, series: cfg.series, data: dbRows })
       } else if (updated.block_type === 'table') {
         const cfg = updated.config as TableBlockConfig
-        const tableRows = dbRows.map(r => cfg.columnKeys.map(k => (r[k] ?? null) as string | number | null))
-        setTableSpec({ columns: cfg.columns, rows: tableRows })
+        const keys = dbRows.length > 0 ? Object.keys(dbRows[0]) : cfg.columnKeys
+        const tableRows = dbRows.map(r => keys.map(k => (r[k] ?? null) as string | number | null))
+        const columns = cfg.columns.length === keys.length ? cfg.columns : keys
+        setTableSpec({ columns, rows: tableRows })
       }
     }
   }
+
+  const question = (block.config as { question?: string }).question
 
   return (
     <div className={styles.wrap}>
@@ -71,6 +79,7 @@ export default function ReportBlockView({ block, canEdit, onMoveUp, onMoveDown, 
         </div>
       </div>
 
+      {question && <div className={styles.question}>Q: {question}</div>}
       <div className={styles.content}>
         {block.block_type === 'text' && (
           <div className={styles.textBlock}>{(block.config as TextBlockConfig).content}</div>
