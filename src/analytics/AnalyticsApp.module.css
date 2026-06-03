@@ -1,0 +1,102 @@
+.shell {
+  display: flex;
+  min-height: 100vh;
+  background: var(--color-neutral-50);
+}
+
+.sidebar {
+  width: 220px;
+  min-width: 220px;
+  background: var(--color-neutral-100);
+  border-right: 1px solid var(--color-neutral-200);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.sidebarHeader {
+  padding: 20px 16px 16px;
+  border-bottom: 1px solid var(--color-neutral-200);
+}
+
+.toolName {
+  display: block;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-primary-600);
+  margin-bottom: 6px;
+}
+
+.backLink {
+  font-size: 0.75rem;
+  color: var(--color-neutral-500);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.backLink:hover { color: var(--color-neutral-700); }
+
+.sideNav {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-neutral-600);
+  transition: all 0.15s;
+  text-decoration: none;
+}
+
+.navItem:hover {
+  background: var(--color-neutral-200);
+  color: var(--color-neutral-800);
+}
+
+.navActive {
+  background: rgba(34,197,94,0.12);
+  color: var(--color-primary-600) !important;
+}
+
+.navIcon {
+  width: 18px;
+  text-align: center;
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.filterWrap {
+  padding: 16px 24px 0;
+}
+
+.main {
+  padding: 20px 24px 40px;
+  flex: 1;
+}
+
+.loadingBar {
+  text-align: center;
+  padding: 12px;
+  color: var(--color-neutral-500);
+  font-size: 0.875rem;
+  background: var(--color-neutral-100);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
