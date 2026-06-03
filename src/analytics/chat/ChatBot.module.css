@@ -2,7 +2,7 @@
 .launcher {
   position: fixed;
   bottom: 24px;
-  right: 24px;
+  left: 24px;
   width: 56px;
   height: 56px;
   border-radius: 50%;
@@ -26,7 +26,7 @@
 .panel {
   position: fixed;
   bottom: 24px;
-  right: 24px;
+  left: 24px;
   width: 420px;
   max-width: calc(100vw - 32px);
   height: 640px;
@@ -218,5 +218,5 @@
 .sendBtn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 @media (max-width: 480px) {
-  .panel { right: 8px; bottom: 8px; width: calc(100vw - 16px); height: calc(100vh - 80px); }
+  .panel { left: 8px; bottom: 8px; width: calc(100vw - 16px); height: calc(100vh - 80px); }
 }
