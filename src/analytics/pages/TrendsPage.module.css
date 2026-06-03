@@ -1,0 +1,54 @@
+.page { display: flex; flex-direction: column; gap: 24px; }
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-neutral-900);
+}
+
+.granToggle { display: flex; gap: 8px; }
+
+.toggleBtn {
+  padding: 6px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--color-neutral-300);
+  background: transparent;
+  color: var(--color-neutral-600);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.toggleBtn:hover {
+  background: var(--color-neutral-200);
+  color: var(--color-neutral-800);
+}
+
+.toggleBtn.active {
+  background: var(--color-primary-600);
+  border-color: var(--color-primary-600);
+  color: #fff;
+}
+
+.chartCard {
+  background: var(--color-neutral-100);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+
+.chartTitle {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-neutral-500);
+  margin-bottom: 12px;
+}

@@ -1,0 +1,102 @@
+.page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 20px 0;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-neutral-900);
+  margin-bottom: 8px;
+}
+
+.sub {
+  font-size: 0.9rem;
+  color: var(--color-neutral-500);
+  margin-bottom: 28px;
+  line-height: 1.6;
+}
+
+.dropZone {
+  border: 2px dashed var(--color-neutral-300);
+  border-radius: 16px;
+  padding: 56px 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--color-neutral-100);
+}
+
+.dropZone:hover, .dragging {
+  border-color: var(--color-primary-600);
+  background: rgba(34,197,94,0.05);
+}
+
+.success {
+  border-color: var(--color-success-500);
+  background: rgba(63,185,80,0.05);
+}
+
+.hidden { display: none; }
+
+.dropIcon {
+  font-size: 2.5rem;
+  margin-bottom: 12px;
+}
+
+.dropTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-neutral-800);
+  margin-bottom: 6px;
+}
+
+.dropSub {
+  font-size: 0.85rem;
+  color: var(--color-neutral-500);
+}
+
+.spinner {
+  color: var(--color-neutral-500);
+  font-size: 0.9rem;
+}
+
+.progressWrap {
+  width: 100%;
+}
+
+.progressLabel {
+  font-size: 0.875rem;
+  color: var(--color-neutral-600);
+  margin-bottom: 12px;
+}
+
+.progressTrack {
+  background: var(--color-neutral-200);
+  border-radius: 100px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--color-primary-600);
+  border-radius: 100px;
+  transition: width 0.3s ease;
+}
+
+.resetBtn {
+  margin-top: 20px;
+  padding: 10px 24px;
+  background: var(--color-primary-600);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.resetBtn:hover { background: var(--color-primary-700); }

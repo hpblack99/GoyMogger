@@ -1,0 +1,113 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  background: var(--color-neutral-50);
+}
+
+.hero {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.logoMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: var(--color-primary-600);
+  color: #fff;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 16px;
+}
+
+.suiteName {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--color-neutral-900);
+  letter-spacing: -0.03em;
+  margin-bottom: 8px;
+}
+
+.suiteTagline {
+  font-size: 1rem;
+  color: var(--color-neutral-500);
+}
+
+.toolGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 600px;
+}
+
+.toolCard {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 24px 28px;
+  background: var(--color-neutral-100);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 16px;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.toolCard:hover {
+  border-color: var(--color-neutral-300);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+
+.toolIcon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.toolInfo { flex: 1; }
+
+.toolName {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-neutral-900);
+  margin-bottom: 2px;
+}
+
+.toolTagline {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.toolDesc {
+  font-size: 0.875rem;
+  color: var(--color-neutral-500);
+  line-height: 1.5;
+}
+
+.arrow {
+  font-size: 1.25rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+
+.toolCard:hover .arrow {
+  transform: translateX(4px);
+}

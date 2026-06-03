@@ -26,7 +26,6 @@ export function categorizeAccessorial(raw: string): string {
 }
 
 export function calcChargeCategories(loads: Load[]): ChargeCategory[] {
-  const totalRevenue = loads.reduce((s, l) => s + (l.load_revenue ?? 0), 0)
   const cats: Record<string, { total: number; loadCount: number }> = {}
 
   loads.forEach(l => {

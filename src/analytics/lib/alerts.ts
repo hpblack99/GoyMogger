@@ -1,5 +1,5 @@
-import type { Load, Alert, KPIs, PeriodKPIs } from './types'
-import { pctChange, safeDiv } from './calculations'
+import type { Load, Alert, PeriodKPIs } from './types'
+import { safeDiv } from './calculations'
 
 let _id = 0
 const id = () => String(++_id)
