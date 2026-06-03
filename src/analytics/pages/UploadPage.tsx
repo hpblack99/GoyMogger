@@ -47,8 +47,43 @@ export default function UploadPage() {
     let done = 0
     let rowTotal = 0
     let uploadError = false
+    let workerFinished = false
+    const queue: Record<string, unknown>[][] = []
+    let draining = false
 
-    worker.onmessage = async (e: MessageEvent<WorkerMsg>) => {
+    async function drainQueue() {
+      if (draining) return
+      draining = true
+      while (queue.length > 0) {
+        if (uploadError) break
+        const batch = queue.shift()!
+        const { error } = await supabase
+          .from('loads')
+          .upsert(batch, { onConflict: 'invoice_num' })
+        if (error) {
+          uploadError = true
+          worker.terminate()
+          workerRef.current = null
+          setStatus('error')
+          setMessage(`Upload error at row ${done}: ${error.message}`)
+          draining = false
+          return
+        }
+        done += batch.length
+        setProgress(done)
+        setMessage(`Uploading… ${done.toLocaleString()} / ${rowTotal.toLocaleString()} rows`)
+      }
+      draining = false
+      if (workerFinished && !uploadError) {
+        worker.terminate()
+        workerRef.current = null
+        setStatus('done')
+        setMessage(`Done! ${done.toLocaleString()} loads upserted (new + updated).`)
+        reload()
+      }
+    }
+
+    worker.onmessage = (e: MessageEvent<WorkerMsg>) => {
       const msg = e.data
 
       if (msg.type === 'start') {
@@ -60,31 +95,14 @@ export default function UploadPage() {
 
       if (msg.type === 'batch') {
         if (uploadError) return
-
-        const { error } = await supabase
-          .from('loads')
-          .upsert(msg.rows, { onConflict: 'invoice_num' })
-
-        if (error) {
-          uploadError = true
-          worker.terminate()
-          setStatus('error')
-          setMessage(`Upload error at row ${done}: ${error.message}`)
-          return
-        }
-
-        done += msg.rows.length
-        setProgress(done)
-        setMessage(`Uploading… ${done.toLocaleString()} / ${rowTotal.toLocaleString()} rows`)
+        queue.push(msg.rows)
+        drainQueue()
         return
       }
 
       if (msg.type === 'done') {
-        worker.terminate()
-        workerRef.current = null
-        setStatus('done')
-        setMessage(`Done! ${done.toLocaleString()} loads upserted (new + updated).`)
-        reload()
+        workerFinished = true
+        drainQueue()
         return
       }
 
