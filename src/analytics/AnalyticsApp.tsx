@@ -69,8 +69,21 @@ export default function AnalyticsApp() {
 
   const load = async () => {
     setLoading(true)
-    const { data } = await supabase.from('loads').select('*').order('booked_date', { ascending: false })
-    setAllLoads((data as Load[]) ?? [])
+    const PAGE = 1000
+    const all: Load[] = []
+    let from = 0
+    while (true) {
+      const { data, error } = await supabase
+        .from('loads')
+        .select('*')
+        .order('booked_date', { ascending: false })
+        .range(from, from + PAGE - 1)
+      if (error || !data || data.length === 0) break
+      all.push(...(data as Load[]))
+      if (data.length < PAGE) break
+      from += PAGE
+    }
+    setAllLoads(all)
     setLoading(false)
   }
 
