@@ -2,8 +2,18 @@
 export const DB_SCHEMA = `
 TABLE loads (one row per freight invoice):
   invoice_num text (unique id), booked_date date,
-  customer_name text, branch_name text, sales_rep text, account_rep text,
-  dispatch_rep text, quote_creator text,
+
+  -- PEOPLE (individuals at FitzMark):
+  sales_rep text        (FitzMark salesperson who owns the account),
+  account_rep text      (FitzMark account manager),
+  dispatch_rep text     (FitzMark dispatcher),
+  quote_creator text    (who created the quote),
+  branch_name text      (FitzMark office branch, e.g. "Fort Worth"),
+
+  -- COMPANIES (external):
+  customer_name text    (the shipping customer / company),
+
+  booked_date date,
   scheduled_pickup_date date, actual_pickup_date date,
   scheduled_delivery_date date, actual_delivery_date date,
   pickup_location_name text, pickup_city text, pickup_state text, pickup_zip text,
@@ -50,6 +60,16 @@ RULES:
 - Output a SINGLE SELECT statement only.
 - NEVER use INSERT, UPDATE, DELETE, DROP, TRUNCATE, ALTER, CREATE, or any DDL/DML. Read-only only.
 - Reference only the tables/columns above.
+
+NAME MATCHING (critical):
+- People (sales reps, account reps, dispatchers) live in: sales_rep, account_rep, dispatch_rep, quote_creator.
+  customer_name is a COMPANY, never a person's name.
+- ALWAYS use fuzzy matching for any name. Split the name into words and match each word independently:
+    WHERE sales_rep ILIKE '%kilian%' OR sales_rep ILIKE '%manns%'
+  This handles typos, partial names, and name order variations.
+- If the user mentions a "rep", "sales rep", "salesperson", or a person's first/last name,
+  query sales_rep (and optionally account_rep). NEVER query customer_name for a person.
+- For branch names: use ILIKE '%fort worth%' etc.
 - Aggregate when the question implies totals/averages/rankings.
 - Always alias computed columns with clear snake_case names.
 - Never SELECT * on large tables; pick the columns you need.
@@ -75,6 +95,10 @@ POSTGRES RULES:
 - date - date returns INTEGER days directly, not an interval. Never use EXTRACT(DAY FROM date - date).
 - Use (date_col - other_date_col) as a plain integer for day counts.
 - To annualize: integer_days / 365.0
+
+NAME MATCHING RULES:
+- People live in sales_rep, account_rep, dispatch_rep — NOT customer_name (that's a company).
+- Always match names with split-word ILIKE: WHERE sales_rep ILIKE '%first%' OR sales_rep ILIKE '%last%'
 
 Return ONLY a corrected JSON object, no markdown:
 {"sql": "<fixed SELECT statement>"}`
