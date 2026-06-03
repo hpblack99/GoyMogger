@@ -21,6 +21,9 @@ const WELCOME: Message = {
   text: "Ask me anything about your freight data. Charts, tables, and insights can be saved directly to a report using the **📌 Save** buttons.",
 }
 
+// How many past messages to load on login (gives the AI context / "memory")
+const HISTORY_LOAD = 40
+
 function renderMd(text: string) {
   const html = text
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -96,11 +99,48 @@ export default function BrainstormPage() {
   const [input, setInput]       = useState('')
   const [busy, setBusy]         = useState(false)
   const [stage, setStage]       = useState('')
+  const [loadingHistory, setLoadingHistory] = useState(true)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Load persisted messages on mount
+  useEffect(() => {
+    supabase
+      .from('brainstorm_messages')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(HISTORY_LOAD)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          const loaded: Message[] = (data as {
+            id: string; role: 'user' | 'assistant'; text: string; result: AssistantResult | null
+          }[])
+            .reverse()
+            .map(r => ({
+              id: r.id,
+              role: r.role,
+              text: r.text,
+              result: r.result ?? undefined,
+            }))
+          setMessages([WELCOME, ...loaded])
+        }
+        setLoadingHistory(false)
+      })
+  }, [user.id])
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, busy])
+
+  const persistMessage = async (msg: Message) => {
+    await supabase.from('brainstorm_messages').insert({
+      id: msg.id,
+      user_id: user.id,
+      role: msg.role,
+      text: msg.text,
+      result: msg.result ?? null,
+    })
+  }
 
   const send = useCallback(async () => {
     const q = input.trim()
@@ -108,6 +148,7 @@ export default function BrainstormPage() {
     setInput('')
     const userMsg: Message = { id: `u${Date.now()}`, role: 'user', text: q }
     setMessages(m => [...m, userMsg])
+    persistMessage(userMsg)
     setBusy(true)
     setStage('Thinking…')
 
@@ -116,13 +157,23 @@ export default function BrainstormPage() {
 
     try {
       const result = await askAssistant(q, history, setStage)
-      setMessages(m => [...m, { id: `a${Date.now()}`, role: 'assistant', text: result.answer || 'Done.', result }])
+      const aMsg: Message = { id: `a${Date.now()}`, role: 'assistant', text: result.answer || 'Done.', result }
+      setMessages(m => [...m, aMsg])
+      persistMessage(aMsg)
     } catch (err) {
-      setMessages(m => [...m, { id: `e${Date.now()}`, role: 'assistant', error: true, text: err instanceof Error ? err.message : String(err) }])
+      const eMsg: Message = { id: `e${Date.now()}`, role: 'assistant', error: true, text: err instanceof Error ? err.message : String(err) }
+      setMessages(m => [...m, eMsg])
+      persistMessage(eMsg)
     } finally { setBusy(false); setStage('') }
-  }, [input, busy, messages])
+  }, [input, busy, messages, user.id])
 
   const onKey = (e: React.KeyboardEvent) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }
+
+  const clearHistory = async () => {
+    if (!confirm('Clear your brainstorm history? This cannot be undone.')) return
+    await supabase.from('brainstorm_messages').delete().eq('user_id', user.id)
+    setMessages([WELCOME])
+  }
 
   // Save a specific piece (chart / table / text) to a report
   const saveToReport = async (
@@ -153,10 +204,9 @@ export default function BrainstormPage() {
       config = { question: msg.text, columns: r.table.columns, columnKeys: r.table.columns }
     } else {
       block_type = 'text'; sql_query = null; title = msg.text.slice(0, 80)
-      config = { content: r.answer }
+      config = { question: msg.text, content: r.answer }
     }
 
-    // position = max existing + 1
     const { data: existing } = await supabase.from('report_blocks').select('position').eq('report_id', actualReportId).order('position', { ascending: false }).limit(1)
     const position = existing?.[0]?.position != null ? existing[0].position + 1 : 0
 
@@ -166,40 +216,54 @@ export default function BrainstormPage() {
   return (
     <div className={styles.page}>
       <div className={styles.header}>
-        <h1 className={styles.title}>Brainstorm</h1>
-        <p className={styles.sub}>Chat with AI about your freight data. Save any chart, table, or insight to a report.</p>
+        <div>
+          <h1 className={styles.title}>Brainstorm</h1>
+          <p className={styles.sub}>Chat with AI about your freight data. Save any chart, table, or insight to a report.</p>
+        </div>
+        {!loadingHistory && messages.length > 1 && (
+          <button className={styles.clearBtn} onClick={clearHistory}>Clear history</button>
+        )}
       </div>
 
       <div className={styles.messages} ref={scrollRef}>
-        {messages.map(msg => (
-          <div key={msg.id} className={`${styles.msg} ${msg.role === 'user' ? styles.msgUser : styles.msgAssistant} ${msg.error ? styles.msgError : ''}`}>
-            <div className={styles.msgText}>{renderMd(msg.text)}</div>
+        {loadingHistory ? (
+          <div className={styles.historyLoading}>Loading conversation history…</div>
+        ) : (
+          <>
+            {messages.length > 1 && (
+              <div className={styles.historyNote}>Showing last {Math.min(messages.length - 1, HISTORY_LOAD)} messages</div>
+            )}
+            {messages.map(msg => (
+              <div key={msg.id} className={`${styles.msg} ${msg.role === 'user' ? styles.msgUser : styles.msgAssistant} ${msg.error ? styles.msgError : ''}`}>
+                <div className={styles.msgText}>{renderMd(msg.text)}</div>
 
-            {msg.result?.chart && (
-              <div className={styles.vizSection}>
-                <ChatChart spec={msg.result.chart} />
-                <SaveMenu label="Save Chart" onSave={(rid, nt) => saveToReport(msg, 'chart', rid, nt)} />
-              </div>
-            )}
-            {msg.result?.table && (
-              <div className={styles.vizSection}>
-                <ChatTable spec={msg.result.table} />
-                <SaveMenu label="Save Table" onSave={(rid, nt) => saveToReport(msg, 'table', rid, nt)} />
-              </div>
-            )}
-            {msg.result && (
-              <div className={styles.saveRow}>
-                <SaveMenu label="Save Explanation" onSave={(rid, nt) => saveToReport(msg, 'text', rid, nt)} />
-                {msg.result.sql && (
-                  <details className={styles.sqlDetails}>
-                    <summary>View SQL</summary>
-                    <pre className={styles.sqlPre}>{msg.result.sql}</pre>
-                  </details>
+                {msg.result?.chart && (
+                  <div className={styles.vizSection}>
+                    <ChatChart spec={msg.result.chart} />
+                    <SaveMenu label="Save Chart" onSave={(rid, nt) => saveToReport(msg, 'chart', rid, nt)} />
+                  </div>
+                )}
+                {msg.result?.table && (
+                  <div className={styles.vizSection}>
+                    <ChatTable spec={msg.result.table} />
+                    <SaveMenu label="Save Table" onSave={(rid, nt) => saveToReport(msg, 'table', rid, nt)} />
+                  </div>
+                )}
+                {msg.result && (
+                  <div className={styles.saveRow}>
+                    <SaveMenu label="Save Explanation" onSave={(rid, nt) => saveToReport(msg, 'text', rid, nt)} />
+                    {msg.result.sql && (
+                      <details className={styles.sqlDetails}>
+                        <summary>View SQL</summary>
+                        <pre className={styles.sqlPre}>{msg.result.sql}</pre>
+                      </details>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
-        ))}
+            ))}
+          </>
+        )}
         {busy && (
           <div className={`${styles.msg} ${styles.msgAssistant}`}>
             <span className={styles.dot} /> {stage}
@@ -212,9 +276,9 @@ export default function BrainstormPage() {
           className={styles.input}
           placeholder="Ask about your freight data… (Enter to send, Shift+Enter for new line)"
           value={input} onChange={e => setInput(e.target.value)}
-          onKeyDown={onKey} rows={2} disabled={busy}
+          onKeyDown={onKey} rows={2} disabled={busy || loadingHistory}
         />
-        <button className={styles.sendBtn} onClick={send} disabled={busy || !input.trim()}>
+        <button className={styles.sendBtn} onClick={send} disabled={busy || !input.trim() || loadingHistory}>
           {busy ? '…' : '↑'}
         </button>
       </div>

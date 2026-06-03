@@ -24,6 +24,33 @@
   margin: 0;
 }
 
+.clearBtn {
+  background: none;
+  border: 1px solid #30363d;
+  border-radius: 7px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  color: #484f58;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+.clearBtn:hover { color: #f85149; border-color: #f85149; }
+
+.historyLoading {
+  color: #484f58;
+  font-size: 0.85rem;
+  padding: 20px 0;
+}
+
+.historyNote {
+  font-size: 0.75rem;
+  color: #30363d;
+  text-align: center;
+  padding: 4px 0 8px;
+}
+
 .messages {
   flex: 1;
   overflow-y: auto;
