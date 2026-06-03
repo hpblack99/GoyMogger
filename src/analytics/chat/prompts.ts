@@ -42,7 +42,8 @@ ${history ? `Recent conversation for context:\n${history}\n` : ''}
 User question: "${question}"
 
 RULES:
-- Output a SINGLE SELECT statement only. No INSERT/UPDATE/DELETE/DDL.
+- Output a SINGLE SELECT statement only.
+- NEVER use INSERT, UPDATE, DELETE, DROP, TRUNCATE, ALTER, CREATE, or any DDL/DML. Read-only only.
 - Reference only the tables/columns above.
 - Aggregate when the question implies totals/averages/rankings.
 - Always alias computed columns with clear snake_case names.

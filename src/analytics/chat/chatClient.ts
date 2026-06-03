@@ -62,6 +62,18 @@ async function runPrompt(prompt: string): Promise<string> {
   )
 }
 
+// Destructive keyword guard — catches anything that isn't a plain SELECT.
+const WRITE_PATTERN = /^\s*(insert|update|delete|drop|truncate|alter|create|replace|merge|grant|revoke|call|exec|execute|copy|vacuum|analyze|explain\s+analyze)\b/i
+
+function assertReadOnly(sql: string) {
+  if (WRITE_PATTERN.test(sql)) {
+    throw new Error(`The assistant attempted a write operation which is not permitted.\n\nSQL blocked:\n${sql}`)
+  }
+  if (!/^\s*select\b/i.test(sql)) {
+    throw new Error(`Only SELECT statements are allowed. The assistant returned:\n${sql}`)
+  }
+}
+
 // Full round trip: question -> SQL -> data -> interpreted answer.
 export async function askAssistant(
   question: string,
@@ -77,9 +89,7 @@ export async function askAssistant(
   } catch {
     sql = sqlRaw.trim() // model may have returned bare SQL
   }
-  if (!sql || !/^\s*select/i.test(sql)) {
-    throw new Error(`The assistant did not return a valid query.\n\n${sqlRaw.slice(0, 300)}`)
-  }
+  assertReadOnly(sql)
 
   // Phase 2 — execute SQL via the safe read-only DB function
   onStage?.('Querying data…')
