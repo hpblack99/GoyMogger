@@ -1,7 +1,8 @@
 import { supabase } from '../../lib/supabase'
 import { buildSqlPrompt, buildInterpretPrompt } from './prompts'
 
-const PA_URL: string = import.meta.env.VITE_PA_CHAT_URL ?? ''
+// Route through the Supabase edge function proxy to avoid CORS on Power Automate
+const PROXY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/pa-chat-proxy`
 
 export interface ChartSpec {
   type: 'line' | 'bar' | 'area' | 'pie'
@@ -38,10 +39,7 @@ function extractJson<T>(raw: string): T {
 
 // Call the single Power Automate flow with a prompt string, return the AI text.
 async function runPrompt(prompt: string): Promise<string> {
-  if (!PA_URL) {
-    throw new Error('Chat is not configured. Set VITE_PA_CHAT_URL in your .env to the Power Automate flow URL.')
-  }
-  const res = await fetch(PA_URL, {
+  const res = await fetch(PROXY_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt }),
