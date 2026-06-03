@@ -49,11 +49,11 @@ function defaultFilters(): AnalyticsFilters {
   const from = new Date()
   from.setDate(to.getDate() - 90)
   return {
-    dateFrom: from.toISOString().slice(0, 10),
-    dateTo:   to.toISOString().slice(0, 10),
-    customer:  '',
-    salesRep:  '',
-    branch:    '',
+    dateFrom:  from.toISOString().slice(0, 10),
+    dateTo:    to.toISOString().slice(0, 10),
+    customers: [],
+    salesReps: [],
+    branches:  [],
   }
 }
 
@@ -96,9 +96,9 @@ export default function AnalyticsApp() {
     return allLoads.filter(l => {
       if (filters.dateFrom && l.booked_date && l.booked_date < filters.dateFrom) return false
       if (filters.dateTo   && l.booked_date && l.booked_date > filters.dateTo)   return false
-      if (filters.customer  && l.customer_name !== filters.customer)  return false
-      if (filters.salesRep  && l.sales_rep     !== filters.salesRep)  return false
-      if (filters.branch    && l.branch_name   !== filters.branch)    return false
+      if (filters.customers.length > 0 && !filters.customers.includes(l.customer_name ?? '')) return false
+      if (filters.salesReps.length > 0 && !filters.salesReps.includes(l.sales_rep ?? ''))     return false
+      if (filters.branches.length  > 0 && !filters.branches.includes(l.branch_name ?? ''))    return false
       return true
     })
   }, [allLoads, filters])
@@ -107,10 +107,22 @@ export default function AnalyticsApp() {
     [...new Set(allLoads.map(l => l.customer_name).filter(Boolean) as string[])].sort(),
     [allLoads]
   )
-  const salesReps = useMemo(() =>
-    [...new Set(allLoads.map(l => l.sales_rep).filter(Boolean) as string[])].sort(),
-    [allLoads]
-  )
+
+  // Fort Worth reps sort first — detect by their most common branch containing "fort worth"
+  const salesReps = useMemo(() => {
+    const reps = [...new Set(allLoads.map(l => l.sales_rep).filter(Boolean) as string[])]
+    const fwReps = new Set(
+      allLoads
+        .filter(l => /fort.?worth/i.test(l.branch_name ?? ''))
+        .map(l => l.sales_rep)
+        .filter(Boolean) as string[]
+    )
+    return [
+      ...reps.filter(r => fwReps.has(r)).sort(),
+      ...reps.filter(r => !fwReps.has(r)).sort(),
+    ]
+  }, [allLoads])
+
   const branches = useMemo(() =>
     [...new Set(allLoads.map(l => l.branch_name).filter(Boolean) as string[])].sort(),
     [allLoads]

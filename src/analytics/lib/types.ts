@@ -83,9 +83,9 @@ export interface PeriodKPIs {
 export interface AnalyticsFilters {
   dateFrom: string
   dateTo: string
-  customer: string
-  salesRep: string
-  branch: string
+  customers: string[]
+  salesReps: string[]
+  branches: string[]
 }
 
 export interface EntitySummary {

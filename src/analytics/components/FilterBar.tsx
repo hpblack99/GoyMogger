@@ -1,4 +1,5 @@
 import type { AnalyticsFilters } from '../lib/types'
+import MultiSelect from './MultiSelect'
 import styles from './FilterBar.module.css'
 
 interface Props {
@@ -10,7 +11,7 @@ interface Props {
 }
 
 export default function FilterBar({ filters, onChange, customers, salesReps, branches }: Props) {
-  const set = (key: keyof AnalyticsFilters) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+  const set = (key: keyof AnalyticsFilters) => (e: React.ChangeEvent<HTMLInputElement>) =>
     onChange({ ...filters, [key]: e.target.value })
 
   return (
@@ -23,27 +24,27 @@ export default function FilterBar({ filters, onChange, customers, salesReps, bra
         <span>To</span>
         <input type="date" value={filters.dateTo} onChange={set('dateTo')} />
       </label>
-      <label className={styles.field}>
-        <span>Customer</span>
-        <select value={filters.customer} onChange={set('customer')}>
-          <option value="">All Customers</option>
-          {customers.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </label>
-      <label className={styles.field}>
-        <span>Sales Rep</span>
-        <select value={filters.salesRep} onChange={set('salesRep')}>
-          <option value="">All Reps</option>
-          {salesReps.map(r => <option key={r} value={r}>{r}</option>)}
-        </select>
-      </label>
-      <label className={styles.field}>
-        <span>Branch</span>
-        <select value={filters.branch} onChange={set('branch')}>
-          <option value="">All Branches</option>
-          {branches.map(b => <option key={b} value={b}>{b}</option>)}
-        </select>
-      </label>
+      <MultiSelect
+        label="Customer"
+        options={customers}
+        value={filters.customers}
+        onChange={v => onChange({ ...filters, customers: v })}
+        allLabel="All Customers"
+      />
+      <MultiSelect
+        label="Sales Rep"
+        options={salesReps}
+        value={filters.salesReps}
+        onChange={v => onChange({ ...filters, salesReps: v })}
+        allLabel="All Reps"
+      />
+      <MultiSelect
+        label="Branch"
+        options={branches}
+        value={filters.branches}
+        onChange={v => onChange({ ...filters, branches: v })}
+        allLabel="All Branches"
+      />
     </div>
   )
 }
