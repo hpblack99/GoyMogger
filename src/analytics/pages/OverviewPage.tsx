@@ -4,14 +4,12 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend
 } from 'recharts'
 import { useAnalytics } from '../AnalyticsApp'
-import { calcPeriodKPIs, calcTrend, fmt } from '../lib/calculations'
+import { calcPeriodKPIs, fmt } from '../lib/calculations'
 import { generateAlerts } from '../lib/alerts'
 import { calcEntitySummaries } from '../lib/calculations'
+import { useMultiTrend, SERIES_COLORS } from '../lib/useMultiSeries'
 import KPICard from '../components/KPICard'
 import styles from './OverviewPage.module.css'
-
-// Colors for multi-series lines
-const SERIES_COLORS = ['#22c55e', '#06b6d4', '#f59e0b', '#a78bfa', '#f472b6', '#fb923c', '#34d399', '#60a5fa']
 
 export default function OverviewPage() {
   const { filteredLoads, filters } = useAnalytics()
@@ -20,7 +18,6 @@ export default function OverviewPage() {
     calcPeriodKPIs(filteredLoads, filters.dateFrom, filters.dateTo),
     [filteredLoads, filters]
   )
-  const trend = useMemo(() => calcTrend(filteredLoads, 'week'), [filteredLoads])
   const kpis = period.current
 
   const customerSummaries = useMemo(() =>
@@ -31,52 +28,10 @@ export default function OverviewPage() {
     generateAlerts(filteredLoads, period, customerSummaries),
     [filteredLoads, period, customerSummaries]
   )
-
   const criticalAlerts = alerts.filter(a => a.severity === 'critical')
 
-  // Determine if we should show per-entity breakdown lines
-  // Priority: salesReps > customers > branches (whatever has multiple selected)
-  const multiDimension = filters.salesReps.length > 1 ? 'salesRep'
-    : filters.customers.length > 1 ? 'customer'
-    : filters.branches.length > 1 ? 'branch'
-    : null
-
-  const multiKeys: string[] = multiDimension === 'salesRep' ? filters.salesReps
-    : multiDimension === 'customer' ? filters.customers
-    : multiDimension === 'branch' ? filters.branches
-    : []
-
-  const loadField = multiDimension === 'salesRep' ? 'sales_rep'
-    : multiDimension === 'customer' ? 'customer_name'
-    : 'branch_name' as 'sales_rep' | 'customer_name' | 'branch_name'
-
-  // Per-entity trend data merged into one array by period key
-  const multiTrend = useMemo(() => {
-    if (!multiDimension) return null
-    const byKey: Record<string, ReturnType<typeof calcTrend>> = {}
-    for (const key of multiKeys) {
-      const subset = filteredLoads.filter(l => (l[loadField] as string) === key)
-      byKey[key] = calcTrend(subset, 'week')
-    }
-    // Collect all period labels
-    const allPeriods = [...new Set([
-      ...trend.map(t => t.period),
-      ...Object.values(byKey).flatMap(arr => arr.map(t => t.period))
-    ])].sort()
-    return allPeriods.map(period => {
-      const base = trend.find(t => t.period === period) ?? { period, revenue: 0, profit: 0, margin: 0 }
-      const row: Record<string, unknown> = { period, gross_revenue: base.revenue, gross_profit: base.profit, gross_margin: base.margin }
-      for (const key of multiKeys) {
-        const pt = byKey[key]?.find(t => t.period === period)
-        row[`rev_${key}`]    = pt?.revenue ?? 0
-        row[`profit_${key}`] = pt?.profit  ?? 0
-        row[`margin_${key}`] = pt?.margin  ?? 0
-      }
-      return row
-    })
-  }, [multiDimension, multiKeys, filteredLoads, loadField, trend])
-
-  const chartData = (multiTrend ?? trend) as Record<string, unknown>[]
+  const { multi, chartData } = useMultiTrend(filteredLoads, filters, 'week')
+  const multiKeys = multi?.keys ?? []
 
   return (
     <div className={styles.page}>
@@ -120,9 +75,8 @@ export default function OverviewPage() {
               <YAxis tick={{ fontSize: 10, fill: '#6e7681' }} tickLine={false} axisLine={false}
                 tickFormatter={(v: number) => `$${(v/1000).toFixed(0)}k`} />
               <Tooltip contentStyle={{ background: '#161b22', border: '1px solid #21262d', borderRadius: 8 }}
-                labelStyle={{ color: '#c9d1d9' }}
-                formatter={(v: number) => fmt.dollar(v)} />
-              {multiDimension ? (
+                labelStyle={{ color: '#c9d1d9' }} formatter={(v: number) => fmt.dollar(v)} />
+              {multi ? (
                 <>
                   <Area type="monotone" dataKey="gross_revenue" name="Gross" stroke="#22c55e" strokeWidth={2} strokeDasharray="5 3" fill="url(#revGrad)" />
                   {multiKeys.map((key, i) => (
@@ -153,9 +107,8 @@ export default function OverviewPage() {
               <YAxis tick={{ fontSize: 10, fill: '#6e7681' }} tickLine={false} axisLine={false}
                 tickFormatter={(v: number) => `$${(v/1000).toFixed(0)}k`} />
               <Tooltip contentStyle={{ background: '#161b22', border: '1px solid #21262d', borderRadius: 8 }}
-                labelStyle={{ color: '#c9d1d9' }}
-                formatter={(v: number) => fmt.dollar(v)} />
-              {multiDimension ? (
+                labelStyle={{ color: '#c9d1d9' }} formatter={(v: number) => fmt.dollar(v)} />
+              {multi ? (
                 <>
                   <Area type="monotone" dataKey="gross_profit" name="Gross" stroke="#a78bfa" strokeWidth={2} strokeDasharray="5 3" fill="url(#profitGrad)" />
                   {multiKeys.map((key, i) => (
@@ -180,9 +133,8 @@ export default function OverviewPage() {
               <YAxis tick={{ fontSize: 10, fill: '#6e7681' }} tickLine={false} axisLine={false}
                 tickFormatter={(v: number) => `${v.toFixed(0)}%`} />
               <Tooltip contentStyle={{ background: '#161b22', border: '1px solid #21262d', borderRadius: 8 }}
-                labelStyle={{ color: '#c9d1d9' }}
-                formatter={(v: number) => `${v.toFixed(1)}%`} />
-              {multiDimension ? (
+                labelStyle={{ color: '#c9d1d9' }} formatter={(v: number) => `${v.toFixed(1)}%`} />
+              {multi ? (
                 <>
                   <Line type="monotone" dataKey="gross_margin" name="Gross" stroke="#06b6d4" strokeWidth={2} strokeDasharray="5 3" dot={false} />
                   {multiKeys.map((key, i) => (
