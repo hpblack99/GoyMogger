@@ -67,6 +67,9 @@ const DATE_FIELDS = new Set([
   'scheduled_delivery_date', 'actual_delivery_date',
 ])
 
+// Fields stored as boolean in DB — Excel value is "Y" / blank
+const BOOLEAN_FIELDS = new Set(['is_vltl'])
+
 // Normalize a header: lowercase, strip spaces/underscores/hyphens
 function normalize(s: string) { return s.toLowerCase().replace(/[\s_\-]/g, '') }
 
@@ -81,17 +84,20 @@ function parseRow(raw: Record<string, unknown>, headerMap: Record<string, string
   for (const [rawKey, dbKey] of Object.entries(headerMap)) {
     const val = raw[rawKey]
     if (val === undefined || val === null || val === '') {
-      out[dbKey] = null
+      out[dbKey] = BOOLEAN_FIELDS.has(dbKey) ? false : null
       continue
     }
-    if (DATE_FIELDS.has(dbKey as string)) {
+    if (BOOLEAN_FIELDS.has(dbKey)) {
+      const s = String(val).trim().toUpperCase()
+      out[dbKey] = s === 'Y' || s === 'YES' || s === 'TRUE' || s === '1'
+    } else if (DATE_FIELDS.has(dbKey)) {
       if (val instanceof Date) {
         out[dbKey] = val.toISOString().slice(0, 10)
       } else {
         const s = String(val)
         out[dbKey] = s.length >= 10 ? s.slice(0, 10) : null
       }
-    } else if (typeof val === 'number' || typeof val === 'boolean') {
+    } else if (typeof val === 'number') {
       out[dbKey] = val
     } else {
       out[dbKey] = String(val).trim() || null
