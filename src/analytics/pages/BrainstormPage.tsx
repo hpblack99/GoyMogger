@@ -217,7 +217,7 @@ export default function BrainstormPage() {
     <div className={styles.page}>
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>Brainstorm</h1>
+          <h1 className={styles.title}>Analytics Assistant</h1>
           <p className={styles.sub}>Chat with AI about your freight data. Save any chart, table, or insight to a report.</p>
         </div>
         {!loadingHistory && messages.length > 1 && (

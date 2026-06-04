@@ -47,7 +47,7 @@ const NAV = [
   { to: '/analytics/discounts',      label: 'Discounts',        icon: '⊟' },
   { to: '/analytics/alerts',         label: 'Alerts',           icon: '◎' },
   null, // divider
-  { to: '/analytics/brainstorm',     label: 'Brainstorm',       icon: '✦' },
+  { to: '/analytics/brainstorm',     label: 'Analytics Assistant', icon: '✦' },
   { to: '/analytics/reports',        label: 'Reports',          icon: '⊡' },
 ]
 
