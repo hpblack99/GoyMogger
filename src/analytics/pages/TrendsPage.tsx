@@ -239,6 +239,9 @@ export default function TrendsPage() {
   const hasCount  = activeKpis.has('loadCount')
   const hasRight  = hasPct || hasCount
 
+  const tickFmt  = gran === 'week' ? fmt.weekRangeTick  : fmt.dateTick
+  const labelFmt = gran === 'week' ? fmt.weekRangeLabel : fmt.date
+
   function renderChart(height: number, interactive: boolean) {
     return (
       <ResponsiveContainer width="100%" height={height}>
@@ -250,7 +253,7 @@ export default function TrendsPage() {
         >
           <CartesianGrid {...gridProps} />
           <XAxis dataKey="period" tick={axisTick} tickLine={false}
-            interval="preserveStartEnd" tickFormatter={fmt.dateTick} />
+            interval="preserveStartEnd" tickFormatter={tickFmt} />
 
           <YAxis yAxisId="left" orientation="left" tick={axisTick} tickLine={false} axisLine={false}
             tickFormatter={(v: number) => `$${(v/1000).toFixed(0)}k`} width={52}
@@ -264,7 +267,7 @@ export default function TrendsPage() {
 
           {!deltaMode && (
             <Tooltip
-              contentStyle={ttStyle} labelStyle={ttLabel} labelFormatter={fmt.date}
+              contentStyle={ttStyle} labelStyle={ttLabel} labelFormatter={labelFmt}
               formatter={(v: unknown, _n: unknown, props: { dataKey?: string | number }) =>
                 fmtVal(v as number, keyFormat[String(props.dataKey ?? '')] ?? 'count')
               }
@@ -296,11 +299,11 @@ export default function TrendsPage() {
       <div className={styles.deltaBox}>
         <div className={styles.deltaHeader}>
           <span className={styles.deltaPeriod}>
-            <span style={{ color: '#60a5fa' }}>A</span> {fmt.dateTick(pA)}
+            <span style={{ color: '#60a5fa' }}>A</span> {tickFmt(pA)}
           </span>
           <span className={styles.deltaArrow}>→</span>
           <span className={styles.deltaPeriod}>
-            <span style={{ color: '#f472b6' }}>B</span> {fmt.dateTick(pB)}
+            <span style={{ color: '#f472b6' }}>B</span> {tickFmt(pB)}
           </span>
         </div>
         <div className={styles.deltaRows}>

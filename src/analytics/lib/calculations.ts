@@ -29,6 +29,27 @@ export const fmt = {
     const d = new Date(iso + 'T00:00:00')
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   },
+  /** Tick label for a weekly period: "Feb 23 – Mar 1" */
+  weekRangeTick: (iso: string): string => {
+    if (!iso) return iso
+    const start = new Date(iso + 'T00:00:00')
+    const end   = new Date(start)
+    end.setDate(end.getDate() + 6)
+    const mo = { month: 'short' as const, day: 'numeric' as const }
+    const s = start.toLocaleDateString('en-US', mo)
+    const e = end.toLocaleDateString('en-US', mo)
+    return `${s} – ${e}`
+  },
+  /** Full tooltip label for a weekly period: "Feb 23 – Mar 1, 2026" */
+  weekRangeLabel: (iso: string): string => {
+    if (!iso) return iso
+    const start = new Date(iso + 'T00:00:00')
+    const end   = new Date(start)
+    end.setDate(end.getDate() + 6)
+    const s = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const e = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    return `${s} – ${e}`
+  },
 }
 
 export function safeDiv(a: number, b: number, fallback = 0): number {
