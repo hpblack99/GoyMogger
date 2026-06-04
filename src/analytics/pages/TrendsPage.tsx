@@ -8,6 +8,7 @@ import { useAnalytics } from '../AnalyticsApp'
 import type { TrendGranularity } from '../lib/calculations'
 import { fmt } from '../lib/calculations'
 import { useMultiTrend, ENTITY_COLORS, GROSS_COLORS } from '../lib/useMultiSeries'
+import FilterBar from '../components/FilterBar'
 import styles from './TrendsPage.module.css'
 
 // ── KPI definitions ───────────────────────────────────────────────────────────
@@ -83,7 +84,7 @@ function GranToggle({ gran, onChange }: { gran: TrendGranularity; onChange: (g: 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function TrendsPage() {
-  const { filteredLoads, filters } = useAnalytics()
+  const { filteredLoads, filters, setFilters, customers, salesReps, branches, customerGroups } = useAnalytics()
   const [gran, setGran]                     = useState<TrendGranularity>('week')
   const [activeKpis, setActiveKpis]         = useState<Set<KpiId>>(new Set(['revenue', 'profit', 'margin', 'loadCount']))
   const [activeEntities, setActiveEntities] = useState<Set<string>>(new Set())
@@ -420,6 +421,15 @@ export default function TrendsPage() {
               </div>
             </div>
 
+            {/* Filters */}
+            <div className={styles.modalFilters}>
+              <FilterBar
+                filters={filters} onChange={setFilters}
+                customers={customers} salesReps={salesReps}
+                branches={branches} customerGroups={customerGroups}
+              />
+            </div>
+
             {/* Metric + entity toggles inside modal */}
             <div className={styles.controls}>
               <div className={styles.controlGroup}>
@@ -459,7 +469,7 @@ export default function TrendsPage() {
 
             {/* Chart + delta box */}
             <div className={styles.chartWithDelta}>
-              {renderChart(520, true)}
+              {renderChart(560, true)}
               <DeltaBox />
             </div>
 

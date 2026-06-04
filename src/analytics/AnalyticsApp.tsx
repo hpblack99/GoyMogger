@@ -29,6 +29,10 @@ interface AnalyticsCtx {
   setFilters: (f: AnalyticsFilters) => void
   loading: boolean
   reload: () => void
+  customers: string[]
+  salesReps: string[]
+  branches: string[]
+  customerGroups: OptionGroup[]
 }
 
 const Ctx = createContext<AnalyticsCtx>(null!)
@@ -147,7 +151,7 @@ export default function AnalyticsApp() {
   ]
 
   return (
-    <Ctx.Provider value={{ allLoads, filteredLoads, filters, setFilters, loading, reload: load }}>
+    <Ctx.Provider value={{ allLoads, filteredLoads, filters, setFilters, loading, reload: load, customers, salesReps, branches, customerGroups }}>
       {loading && (
         <div className={styles.loadingOverlay}>
           <div className={styles.loadingBox}>
