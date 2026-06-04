@@ -1,74 +1,65 @@
 export default function FreightAnalyticsLogo({ className }: { className?: string }) {
   return (
     <svg
-      viewBox="0 0 340 96"
+      viewBox="0 0 400 90"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
       aria-label="Freight Analytics by HankNet"
     >
       <defs>
-        <linearGradient id="faGrad" x1="0.1" y1="1" x2="0.6" y2="0">
-          <stop offset="0%"   stopColor="#16a34a" />
-          <stop offset="100%" stopColor="#4ade80" />
-        </linearGradient>
-        <linearGradient id="faGradV" x1="0" y1="1" x2="0" y2="0">
-          <stop offset="0%"   stopColor="#16a34a" />
+        <linearGradient id="faG" x1="0.1" y1="1" x2="0.5" y2="0">
+          <stop offset="0%"   stopColor="#15803d" />
           <stop offset="100%" stopColor="#4ade80" />
         </linearGradient>
       </defs>
 
-      {/* ── FA Icon ─────────────────────────────────────── */}
+      {/* ── Icon ──────────────────────────────────────────── */}
 
-      {/* Vertical stroke of the F */}
-      <rect x="4" y="6" width="13" height="80" rx="3" fill="url(#faGrad)" />
+      {/* Vertical stroke of F */}
+      <rect x="3"  y="5"  width="12" height="76" rx="2.5" fill="url(#faG)" />
 
-      {/* Top horizontal bar of F */}
-      <rect x="17" y="6" width="38" height="13" rx="3" fill="url(#faGrad)" />
+      {/* Top horizontal bar */}
+      <rect x="15" y="5"  width="36" height="12" rx="2.5" fill="url(#faG)" />
 
-      {/* Middle horizontal bar of F */}
-      <rect x="17" y="33" width="27" height="11" rx="3" fill="url(#faGrad)" />
+      {/* Middle horizontal bar */}
+      <rect x="15" y="31" width="26" height="11" rx="2.5" fill="url(#faG)" />
 
-      {/* Bar chart columns (lower section of icon) */}
-      <rect x="18" y="61" width="9" height="25" rx="2" fill="url(#faGradV)" />
-      <rect x="29" y="51" width="9" height="35" rx="2" fill="url(#faGradV)" />
-      <rect x="40" y="41" width="9" height="45" rx="2" fill="url(#faGradV)" />
+      {/* Bar chart columns */}
+      <rect x="16" y="60" width="8"  height="21" rx="1.5" fill="url(#faG)" />
+      <rect x="26" y="51" width="8"  height="30" rx="1.5" fill="url(#faG)" />
+      <rect x="36" y="42" width="8"  height="39" rx="1.5" fill="url(#faG)" />
 
-      {/* Trend arrow — diagonal line from bottom-left to upper-right */}
+      {/* Trend arrow line */}
       <line
-        x1="14" y1="78"
-        x2="54" y2="14"
-        stroke="url(#faGrad)"
-        strokeWidth="5.5"
+        x1="12" y1="76"
+        x2="51" y2="13"
+        stroke="url(#faG)"
+        strokeWidth="5"
         strokeLinecap="round"
       />
-      {/* Arrowhead at the top right */}
-      <polygon
-        points="54,5  67,21  46,19"
-        fill="url(#faGrad)"
-      />
+      {/* Arrowhead */}
+      <polygon points="51,4 64,19 43,18" fill="url(#faG)" />
 
-      {/* ── Text ────────────────────────────────────────── */}
+      {/* ── Text ──────────────────────────────────────────── */}
 
-      {/* "Freight Analytics" */}
       <text
-        x="88" y="56"
+        x="82" y="52"
         fontFamily="'Segoe UI','Inter',system-ui,sans-serif"
-        fontSize="36"
+        fontSize="34"
         fontWeight="800"
-        letterSpacing="-0.8"
-        fill="url(#faGrad)"
+        letterSpacing="-0.5"
+        fill="url(#faG)"
       >
         Freight Analytics
       </text>
 
-      {/* "by HankNet" */}
       <text
-        x="91" y="76"
+        x="85" y="70"
         fontFamily="'Segoe UI','Inter',system-ui,sans-serif"
-        fontSize="15"
+        fontSize="14"
         fontWeight="400"
-        fill="rgba(255,255,255,0.72)"
-        letterSpacing="0.2"
+        fill="rgba(255,255,255,0.7)"
+        letterSpacing="0.3"
       >
         by HankNet
       </text>
