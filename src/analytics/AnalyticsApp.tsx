@@ -167,7 +167,7 @@ export default function AnalyticsApp() {
         {/* Sidebar */}
         <aside className={styles.sidebar}>
           <div className={styles.sidebarHeader}>
-            <span className={styles.toolName}>Freight Analytics</span>
+            <img src="/freight-analytics-logo.png" alt="Freight Analytics" className={styles.logoImg} />
             <a href="/" className={styles.backLink}>← HankNet</a>
           </div>
           <nav className={styles.sideNav}>

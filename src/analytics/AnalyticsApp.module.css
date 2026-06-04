@@ -22,12 +22,13 @@
   border-bottom: 1px solid var(--color-neutral-200);
 }
 
-.toolName {
+.logoImg {
   display: block;
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--color-primary-600);
-  margin-bottom: 6px;
+  width: 100%;
+  max-width: 188px;
+  height: auto;
+  margin-bottom: 8px;
+  object-fit: contain;
 }
 
 .backLink {
