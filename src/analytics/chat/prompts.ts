@@ -23,10 +23,17 @@ TABLE loads (one row per freight invoice):
   max_length numeric, max_width numeric, max_height numeric, is_vltl boolean,
   current_carrier_name text, quote_accepted_carrier_tariff_name text,
   service_level text, transit_days int,
+
+  -- QUOTE columns (estimates only, do NOT use for actual KPIs):
   quote_orig_rev numeric, quote_original_exp numeric, quote_orig_profit numeric,
   quote_current_rev numeric, quote_current_exp numeric, quote_current_profit numeric,
-  load_revenue numeric (actual revenue), load_carrier_expense numeric,
-  load_other_expense numeric, load_profit numeric (actual profit),
+
+  -- ACTUAL financials (always use these for revenue / profit / margin questions):
+  load_revenue numeric        (actual billed revenue — this is THE revenue figure),
+  load_carrier_expense numeric (carrier cost only),
+  load_other_expense numeric  (other costs),
+  load_profit numeric         (actual net profit = load_revenue - load_carrier_expense - load_other_expense — this is THE profit figure),
+
   load_accessorials text,
   cheapest_rev numeric, cheapest_exp numeric, cheapest_option_carrier text
 
@@ -34,16 +41,22 @@ TABLE load_charges (charge detail rows, many per invoice):
   invoice_num text (-> loads.invoice_num), type text, description text,
   units numeric, unit_rate numeric, subtotal numeric, charge_category text
 
-POSTGRES RULES (important):
+DASHBOARD KPI DEFINITIONS (your answers must match these exactly):
+  revenue       = SUM(load_revenue)
+  profit        = SUM(load_profit)            ← NEVER compute as revenue - expenses; use load_profit directly
+  margin %      = SUM(load_profit) / NULLIF(SUM(load_revenue), 0) * 100
+  load count    = COUNT(*)
+  rev per load  = SUM(load_revenue) / COUNT(*)
+  profit/load   = SUM(load_profit) / COUNT(*)
+
+POSTGRES RULES:
 - date - date returns INTEGER days, NOT an interval. Use it directly as a number.
   WRONG: EXTRACT(DAY FROM CURRENT_DATE - some_date)
   RIGHT: (CURRENT_DATE - some_date) -- already an integer
-- To convert integer days to years: days / 365.0
-- For interval arithmetic use INTERVAL: e.g. CURRENT_DATE - INTERVAL '90 days'
-- margin % = load_profit / NULLIF(load_revenue, 0) * 100
-- Use ILIKE '%term%' for fuzzy text matching (names vary in casing).
+- Time ranges: use booked_date with INTERVAL, e.g. WHERE booked_date >= CURRENT_DATE - INTERVAL '2 months'
+- NEVER use quote_orig_profit, quote_current_profit, or any quote_* column when the question is about actual profit/revenue.
 - "discount" = quote_orig_rev - load_revenue (when positive).
-- Dates are ISO (YYYY-MM-DD). Filter booked_date for time ranges.
+- Dates are ISO (YYYY-MM-DD). Always filter on booked_date for time ranges.
 `.trim()
 
 // ── Prompt builders ───────────────────────────────────────────────────────────
@@ -60,6 +73,8 @@ RULES:
 - Output a SINGLE SELECT statement only.
 - NEVER use INSERT, UPDATE, DELETE, DROP, TRUNCATE, ALTER, CREATE, or any DDL/DML. Read-only only.
 - Reference only the tables/columns above.
+- For any revenue/profit/margin question ALWAYS use load_revenue and load_profit. NEVER use quote_orig_profit, quote_current_profit, or manually compute revenue - expenses. load_profit is the authoritative profit column.
+- Always filter on booked_date for date ranges. Use INTERVAL syntax: booked_date >= CURRENT_DATE - INTERVAL '2 months'.
 
 NAME MATCHING (critical):
 - People (sales reps, account reps, dispatchers) live in: sales_rep, account_rep, dispatch_rep, quote_creator.
