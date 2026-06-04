@@ -18,6 +18,7 @@ import BrainstormPage from './pages/BrainstormPage'
 import ReportsPage from './pages/ReportsPage'
 import ReportEditorPage from './pages/ReportEditorPage'
 import ChatBot from './chat/ChatBot'
+import FreightAnalyticsLogo from './components/FreightAnalyticsLogo'
 import styles from './AnalyticsApp.module.css'
 
 // ── Context ──────────────────────────────────────────────────────────────────
@@ -167,7 +168,7 @@ export default function AnalyticsApp() {
         {/* Sidebar */}
         <aside className={styles.sidebar}>
           <div className={styles.sidebarHeader}>
-            <img src="/freight-analytics-logo.png" alt="Freight Analytics" className={styles.logoImg} />
+            <FreightAnalyticsLogo className={styles.logoImg} />
             <a href="/" className={styles.backLink}>← HankNet</a>
           </div>
           <nav className={styles.sideNav}>
