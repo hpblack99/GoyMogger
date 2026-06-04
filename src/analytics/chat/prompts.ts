@@ -127,24 +127,37 @@ export function buildInterpretPrompt(question: string, sql: string, data: unknow
 This SQL was run:
 ${sql}
 
-It returned ${data.length} row(s) of JSON data:
+It returned ${data.length} row(s):
 ${JSON.stringify(data).slice(0, 12000)}
 
-Interpret the data and answer the question conversationally. If a visualization helps, include a chart and/or table.
+Answer the question conversationally. Include a chart and/or table when it adds value.
 
-Respond with ONLY a JSON object, no markdown fences, in this exact shape:
+CHART GUIDANCE:
+- Use "area" for trends over time (weekly/monthly series) — best for revenue/profit over time
+- Use "bar" for comparisons across categories (reps, customers, carriers) — best for rankings
+- Use "line" for multiple trend series on the same axis
+- Use "pie" only for share/composition with ≤8 slices
+- xKey must be the field name (not display label) of the category/time axis
+- series[].key must be the exact numeric field name from the SQL result
+- series[].label is the human-readable display label (e.g. "Gross Profit", not "load_profit")
+- data[] must use the exact field names from the SQL result rows
+- Keep chart data under 50 points
+
+TABLE GUIDANCE:
+- Include a table whenever there are multiple rows of detail (rankings, lists, breakdowns)
+- columns[] are display headers (e.g. "Sales Rep", "Revenue", "Profit", "Margin %")
+- rows[][] must have values in the same order as columns
+- Format numbers as plain numbers in rows (not strings with $ — the UI formats them)
+
+ANSWER GUIDANCE:
+- Lead with the key number(s) bolded using **value**
+- Add 1-2 sentences of context or insight
+- Use $ and % where relevant
+
+Respond with ONLY a JSON object, no markdown fences:
 {
-  "answer": "<concise markdown answer, use $ and % where relevant>",
-  "chart": null OR {
-    "type": "line" | "bar" | "area" | "pie",
-    "xKey": "<field name for x-axis / category>",
-    "series": [{"key": "<numeric field>", "label": "<display label>"}],
-    "data": [ { ...row objects using the field names... } ]
-  },
-  "table": null OR {
-    "columns": ["Col A", "Col B"],
-    "rows": [["v1", "v2"], ...]
-  }
-}
-Keep chart data under 50 points. Prefer a chart for trends/comparisons, a table for detailed lists, both if useful.`
+  "answer": "<markdown with **bold** numbers>",
+  "chart": null | { "type": "bar"|"line"|"area"|"pie", "xKey": "<field>", "series": [{"key": "<field>", "label": "<label>"}], "data": [{...}] },
+  "table": null | { "columns": ["Col A", ...], "rows": [[val, ...], ...] }
+}`
 }
