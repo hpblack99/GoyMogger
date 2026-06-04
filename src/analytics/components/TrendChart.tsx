@@ -186,7 +186,10 @@ export default function TrendChart({
     // Pick container type based on what's in series
     const hasBar  = grossSeries.some(s => s.shape === 'bar') || entityGroups.some(g => g.series.some(s => s.shape === 'bar'))
     const hasArea = grossSeries.some(s => s.shape === 'area')
-    const ChartEl = (hasDual || hasBar) ? ComposedChart : hasArea ? AreaChart : LineChart
+    const hasEntityLines = showEntities.length > 0 && entityGroups.some(g =>
+      showEntities.includes(g.label) && g.series.some(s => s.shape === 'line')
+    )
+    const ChartEl = (hasDual || hasBar || (hasArea && hasEntityLines)) ? ComposedChart : hasArea ? AreaChart : LineChart
 
     return (
       <ResponsiveContainer width="100%" height={h}>
