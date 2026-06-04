@@ -5,6 +5,7 @@ import {
   Bar,
 } from 'recharts'
 import type { TrendGranularity } from '../lib/calculations'
+import { fmt } from '../lib/calculations'
 import styles from './TrendChart.module.css'
 
 const axisTick = { fontSize: 10, fill: '#6e7681' }
@@ -164,14 +165,15 @@ export default function TrendChart({
     const axes = (
       <>
         <CartesianGrid {...grid} />
-        <XAxis dataKey="period" tick={axisTick} tickLine={false} interval="preserveStartEnd" />
+        <XAxis dataKey="period" tick={axisTick} tickLine={false} interval="preserveStartEnd"
+          tickFormatter={fmt.dateTick} />
         <YAxis yAxisId="left" tick={axisTick} tickLine={false} axisLine={false}
           tickFormatter={tt} width={48} />
         {hasDual && (
           <YAxis yAxisId="right" orientation="right" tick={axisTick} tickLine={false} axisLine={false}
             tickFormatter={rightValueType ? fmtTick(rightValueType) : (v: number) => `${v.toFixed(0)}%`} width={40} />
         )}
-        <Tooltip contentStyle={ttStyle} labelStyle={ttLabel}
+        <Tooltip contentStyle={ttStyle} labelStyle={ttLabel} labelFormatter={fmt.date}
           formatter={(v: number, name: string) => {
             const isRight = grossSeries.find(s => s.name === name)?.rightAxis ||
               entityGroups.some(g => g.series.find(s => `${g.label} – ${s.name}` === name)?.rightAxis)

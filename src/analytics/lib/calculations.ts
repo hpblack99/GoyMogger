@@ -8,6 +8,27 @@ export const fmt = {
   pct: (n: number) => `${n.toFixed(1)}%`,
   num: (n: number) => n.toLocaleString('en-US'),
   change: (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}%`,
+  /** Format an ISO date string or YYYY-MM partial as "Apr 7, 2026" */
+  date: (iso: string): string => {
+    if (!iso) return iso
+    // YYYY-MM (month period key)
+    if (/^\d{4}-\d{2}$/.test(iso)) {
+      const d = new Date(iso + '-01T00:00:00')
+      return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    }
+    const d = new Date(iso + 'T00:00:00')
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  },
+  /** Shorter chart tick version — "Apr 7" (drops year to save space) */
+  dateTick: (iso: string): string => {
+    if (!iso) return iso
+    if (/^\d{4}-\d{2}$/.test(iso)) {
+      const d = new Date(iso + '-01T00:00:00')
+      return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+    }
+    const d = new Date(iso + 'T00:00:00')
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  },
 }
 
 export function safeDiv(a: number, b: number, fallback = 0): number {

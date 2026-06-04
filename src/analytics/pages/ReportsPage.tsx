@@ -112,7 +112,7 @@ export default function ReportsPage() {
     setMyReports(r => r.filter(x => x.id !== id))
   }
 
-  const fmt = (s: string) => new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const fmtDate = (s: string) => new Date(s).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 
   if (loading) return <div className={styles.loading}>Loading reports…</div>
 
@@ -146,7 +146,7 @@ export default function ReportsPage() {
                 <div className={styles.cardBody} onClick={() => navigate(`/analytics/reports/${r.id}`)}>
                   <div className={styles.cardTitle}>{r.title}</div>
                   {r.description && <div className={styles.cardDesc}>{r.description}</div>}
-                  <div className={styles.cardDate}>Updated {fmt(r.updated_at)}</div>
+                  <div className={styles.cardDate}>Updated {fmtDate(r.updated_at)}</div>
                 </div>
                 <div className={styles.cardActions}>
                   <button className={styles.cardBtn} onClick={() => navigate(`/analytics/reports/${r.id}`)}>Open</button>
@@ -168,7 +168,7 @@ export default function ReportsPage() {
                 <div className={styles.cardBody} onClick={() => navigate(`/analytics/reports/${r.id}`)}>
                   <div className={styles.cardTitle}>{r.title}</div>
                   {r.description && <div className={styles.cardDesc}>{r.description}</div>}
-                  <div className={styles.cardDate}>Updated {fmt(r.updated_at)}</div>
+                  <div className={styles.cardDate}>Updated {fmtDate(r.updated_at)}</div>
                 </div>
                 <div className={styles.cardActions}>
                   <button className={styles.cardBtn} onClick={() => navigate(`/analytics/reports/${r.id}`)}>Open</button>
