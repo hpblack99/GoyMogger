@@ -1,14 +1,12 @@
 import { useMemo } from 'react'
-import {
-  LineChart, Line, AreaChart, Area,
-  XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend
-} from 'recharts'
 import { useAnalytics } from '../AnalyticsApp'
 import { calcPeriodKPIs, fmt } from '../lib/calculations'
 import { generateAlerts } from '../lib/alerts'
 import { calcEntitySummaries } from '../lib/calculations'
 import { useMultiTrend, SERIES_COLORS } from '../lib/useMultiSeries'
 import KPICard from '../components/KPICard'
+import TrendChart from '../components/TrendChart'
+import type { EntityGroup } from '../components/TrendChart'
 import styles from './OverviewPage.module.css'
 
 export default function OverviewPage() {
@@ -30,8 +28,50 @@ export default function OverviewPage() {
   )
   const criticalAlerts = alerts.filter(a => a.severity === 'critical')
 
-  const { multi, chartData } = useMultiTrend(filteredLoads, filters, 'week')
+  const { multi, chartData: weekData } = useMultiTrend(filteredLoads, filters, 'week')
+  const { chartData: dayData }         = useMultiTrend(filteredLoads, filters, 'day')
+  const { chartData: monthData }       = useMultiTrend(filteredLoads, filters, 'month')
   const multiKeys = multi?.keys ?? []
+
+  const marginEntityGroups: EntityGroup[] = multiKeys.map((key, i) => ({
+    label: key,
+    color: SERIES_COLORS[(i + 1) % SERIES_COLORS.length],
+    series: [{ dataKey: `margin_${key}`, name: 'Margin', shape: 'line' as const }],
+  }))
+
+  const loadEntityGroups: EntityGroup[] = multiKeys.map((key, i) => ({
+    label: key,
+    color: SERIES_COLORS[(i + 1) % SERIES_COLORS.length],
+    series: [{ dataKey: `loads_${key}`, name: 'Loads', shape: 'line' as const }],
+  }))
+
+  const revEntityGroups: EntityGroup[] = multiKeys.map((key, i) => ({
+    label: key,
+    color: SERIES_COLORS[(i + 1) % SERIES_COLORS.length],
+    series: [{ dataKey: `rev_${key}`, name: 'Revenue', shape: 'line' as const }],
+  }))
+
+  const profitEntityGroups: EntityGroup[] = multiKeys.map((key, i) => ({
+    label: key,
+    color: SERIES_COLORS[(i + 1) % SERIES_COLORS.length],
+    series: [{ dataKey: `profit_${key}`, name: 'Profit', shape: 'line' as const }],
+  }))
+
+  const revGrossSeries = multi
+    ? [{ dataKey: 'gross_revenue', name: 'Gross Revenue', color: '#22c55e', shape: 'area' as const, dashed: true }]
+    : [{ dataKey: 'revenue',       name: 'Revenue',       color: '#22c55e', shape: 'area' as const }]
+
+  const profitGrossSeries = multi
+    ? [{ dataKey: 'gross_profit', name: 'Gross Profit', color: '#a78bfa', shape: 'area' as const, dashed: true }]
+    : [{ dataKey: 'profit',       name: 'Profit',       color: '#a78bfa', shape: 'area' as const }]
+
+  const marginGrossSeries = multi
+    ? [{ dataKey: 'gross_margin', name: 'Gross Margin', color: '#06b6d4', shape: 'line' as const, dashed: true }]
+    : [{ dataKey: 'margin',       name: 'Margin %',     color: '#06b6d4', shape: 'line' as const }]
+
+  const loadGrossSeries = multi
+    ? [{ dataKey: 'gross_loadCount', name: 'Gross Loads', color: '#8b5cf6', shape: 'bar' as const, dashed: true }]
+    : [{ dataKey: 'loadCount',       name: 'Loads',       color: '#8b5cf6', shape: 'bar' as const }]
 
   return (
     <div className={styles.page}>
@@ -57,97 +97,35 @@ export default function OverviewPage() {
         <KPICard label="Active Reps"      value={fmt.num(kpis.activeSalesReps)}   change={period.changes.activeSalesReps}/>
       </div>
 
-      {/* Charts */}
       <div className={styles.charts}>
-        {/* Revenue by Week */}
-        <div className={styles.chartCard}>
-          <div className={styles.chartTitle}>Revenue by Week</div>
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="#22c55e" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#21262d" />
-              <XAxis dataKey="period" tick={{ fontSize: 10, fill: '#6e7681' }} tickLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: '#6e7681' }} tickLine={false} axisLine={false}
-                tickFormatter={(v: number) => `$${(v/1000).toFixed(0)}k`} />
-              <Tooltip contentStyle={{ background: '#161b22', border: '1px solid #21262d', borderRadius: 8 }}
-                labelStyle={{ color: '#c9d1d9' }} formatter={(v: number) => fmt.dollar(v)} />
-              {multi ? (
-                <>
-                  <Area type="monotone" dataKey="gross_revenue" name="Gross" stroke="#22c55e" strokeWidth={2} strokeDasharray="5 3" fill="url(#revGrad)" />
-                  {multiKeys.map((key, i) => (
-                    <Line key={key} type="monotone" dataKey={`rev_${key}`} name={key} stroke={SERIES_COLORS[(i + 1) % SERIES_COLORS.length]} strokeWidth={1.5} dot={false} />
-                  ))}
-                  <Legend wrapperStyle={{ fontSize: 11, color: '#6e7681' }} />
-                </>
-              ) : (
-                <Area type="monotone" dataKey="revenue" stroke="#22c55e" strokeWidth={2} fill="url(#revGrad)" />
-              )}
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Profit by Week */}
-        <div className={styles.chartCard}>
-          <div className={styles.chartTitle}>Profit by Week</div>
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="profitGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="#a78bfa" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#a78bfa" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#21262d" />
-              <XAxis dataKey="period" tick={{ fontSize: 10, fill: '#6e7681' }} tickLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: '#6e7681' }} tickLine={false} axisLine={false}
-                tickFormatter={(v: number) => `$${(v/1000).toFixed(0)}k`} />
-              <Tooltip contentStyle={{ background: '#161b22', border: '1px solid #21262d', borderRadius: 8 }}
-                labelStyle={{ color: '#c9d1d9' }} formatter={(v: number) => fmt.dollar(v)} />
-              {multi ? (
-                <>
-                  <Area type="monotone" dataKey="gross_profit" name="Gross" stroke="#a78bfa" strokeWidth={2} strokeDasharray="5 3" fill="url(#profitGrad)" />
-                  {multiKeys.map((key, i) => (
-                    <Line key={key} type="monotone" dataKey={`profit_${key}`} name={key} stroke={SERIES_COLORS[(i + 1) % SERIES_COLORS.length]} strokeWidth={1.5} dot={false} />
-                  ))}
-                  <Legend wrapperStyle={{ fontSize: 11, color: '#6e7681' }} />
-                </>
-              ) : (
-                <Area type="monotone" dataKey="profit" stroke="#a78bfa" strokeWidth={2} fill="url(#profitGrad)" />
-              )}
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Margin % by Week */}
-        <div className={styles.chartCard}>
-          <div className={styles.chartTitle}>Margin % by Week</div>
-          <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#21262d" />
-              <XAxis dataKey="period" tick={{ fontSize: 10, fill: '#6e7681' }} tickLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: '#6e7681' }} tickLine={false} axisLine={false}
-                tickFormatter={(v: number) => `${v.toFixed(0)}%`} />
-              <Tooltip contentStyle={{ background: '#161b22', border: '1px solid #21262d', borderRadius: 8 }}
-                labelStyle={{ color: '#c9d1d9' }} formatter={(v: number) => `${v.toFixed(1)}%`} />
-              {multi ? (
-                <>
-                  <Line type="monotone" dataKey="gross_margin" name="Gross" stroke="#06b6d4" strokeWidth={2} strokeDasharray="5 3" dot={false} />
-                  {multiKeys.map((key, i) => (
-                    <Line key={key} type="monotone" dataKey={`margin_${key}`} name={key} stroke={SERIES_COLORS[(i + 2) % SERIES_COLORS.length]} strokeWidth={1.5} dot={false} />
-                  ))}
-                  <Legend wrapperStyle={{ fontSize: 11, color: '#6e7681' }} />
-                </>
-              ) : (
-                <Line type="monotone" dataKey="margin" stroke="#06b6d4" strokeWidth={2} dot={false} />
-              )}
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+        <TrendChart
+          title="Revenue by Week"
+          weekData={weekData} dayData={dayData} monthData={monthData}
+          grossSeries={revGrossSeries}
+          entityGroups={revEntityGroups}
+          valueType="dollar"
+        />
+        <TrendChart
+          title="Profit by Week"
+          weekData={weekData} dayData={dayData} monthData={monthData}
+          grossSeries={profitGrossSeries}
+          entityGroups={profitEntityGroups}
+          valueType="dollar"
+        />
+        <TrendChart
+          title="Margin % by Week"
+          weekData={weekData} dayData={dayData} monthData={monthData}
+          grossSeries={marginGrossSeries}
+          entityGroups={marginEntityGroups}
+          valueType="pct"
+        />
+        <TrendChart
+          title="Load Count by Week"
+          weekData={weekData} dayData={dayData} monthData={monthData}
+          grossSeries={loadGrossSeries}
+          entityGroups={loadEntityGroups}
+          valueType="count"
+        />
       </div>
 
       {alerts.length > 0 && (

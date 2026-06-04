@@ -1,0 +1,177 @@
+.card {
+  background: var(--color-neutral-100);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-neutral-500);
+  white-space: nowrap;
+  padding-top: 2px;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+/* Entity toggle pills */
+.entityToggles {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.entityBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--color-neutral-200);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: 20px;
+  padding: 2px 8px 2px 5px;
+  font-size: 0.7rem;
+  color: var(--color-neutral-500);
+  cursor: pointer;
+  transition: all 0.12s;
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.entityBtn:hover { border-color: var(--color-neutral-500); color: var(--color-neutral-700); }
+.entityBtnOn { font-weight: 600; }
+
+.entityDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.entityName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 110px;
+}
+
+/* Granularity toggle */
+.granToggle {
+  display: flex;
+  background: var(--color-neutral-200);
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--color-neutral-300);
+}
+
+.granBtn {
+  background: none;
+  border: none;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--color-neutral-500);
+  cursor: pointer;
+  transition: all 0.1s;
+}
+.granBtn:hover { color: var(--color-neutral-700); }
+.granActive {
+  background: var(--color-primary-600) !important;
+  color: #fff !important;
+  font-weight: 700;
+}
+
+/* Expand button */
+.expandBtn {
+  background: none;
+  border: 1px solid var(--color-neutral-300);
+  border-radius: 6px;
+  padding: 3px 7px;
+  font-size: 0.9rem;
+  color: var(--color-neutral-400);
+  cursor: pointer;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: color 0.1s, border-color 0.1s;
+}
+.expandBtn:hover { color: var(--color-neutral-700); border-color: var(--color-neutral-500); }
+
+/* Expand modal */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal {
+  background: var(--color-neutral-100);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 14px;
+  padding: 20px 24px;
+  width: 100%;
+  max-width: 1000px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.modalTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-neutral-800);
+}
+
+.modalControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.closeBtn {
+  background: none;
+  border: 1px solid var(--color-neutral-300);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.85rem;
+  color: var(--color-neutral-500);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.closeBtn:hover { color: var(--color-error-500); border-color: var(--color-error-500); }
