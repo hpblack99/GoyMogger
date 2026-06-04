@@ -390,9 +390,22 @@ export default function TrendsPage() {
       {/* Chart card */}
       <div className={styles.chartCard}>
         <div className={styles.chartCardHeader}>
+          <div className={styles.chartCardLeft}>
+            <button
+              className={`${styles.deltaBtn} ${deltaMode ? styles.deltaBtnOn : ''}`}
+              onClick={toggleDeltaMode}
+              title="Click two points on the chart to compare">
+              Δ Compare
+            </button>
+            {deltaMode && !pA && <span className={styles.deltaHintTop}>Click point A on chart</span>}
+            {deltaMode && pA && !pB && <span className={styles.deltaHintTop}>Click point B on chart</span>}
+          </div>
           <button className={styles.expandBtn} onClick={() => setExpanded(true)} title="Full screen">⛶</button>
         </div>
-        {renderChart(460, false)}
+        <div className={styles.chartWithDelta}>
+          {renderChart(460, true)}
+          <DeltaBox />
+        </div>
         <DashLegend />
       </div>
 

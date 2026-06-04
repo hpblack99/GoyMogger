@@ -103,7 +103,14 @@
 
 .chartCardHeader {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chartCardLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* Expand button */
@@ -212,23 +219,24 @@
 }
 .closeBtn:hover { color: var(--color-error-500); border-color: var(--color-error-500); }
 
-/* Delta compare button */
+/* Delta compare button — always blue */
 .deltaBtn {
   background: none;
-  border: 1px solid var(--color-neutral-300);
+  border: 1px solid #3b82f6;
   border-radius: 6px;
   padding: 5px 12px;
   font-size: 0.78rem;
   font-weight: 600;
-  color: var(--color-neutral-500);
+  color: #60a5fa;
   cursor: pointer;
   transition: all 0.12s;
 }
-.deltaBtn:hover { border-color: #60a5fa; color: #60a5fa; }
+.deltaBtn:hover { background: #60a5fa1a; }
 .deltaBtnOn {
-  background: #60a5fa1a !important;
+  background: #3b82f61a !important;
   border-color: #60a5fa !important;
-  color: #60a5fa !important;
+  color: #93c5fd !important;
+  box-shadow: 0 0 0 2px #3b82f640;
 }
 
 .deltaHintTop {
