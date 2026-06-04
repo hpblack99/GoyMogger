@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthGate'
 import type { Load, AnalyticsFilters } from './lib/types'
 import FilterBar from './components/FilterBar'
+import type { OptionGroup } from './components/MultiSelect'
 import UploadPage from './pages/UploadPage'
 import OverviewPage from './pages/OverviewPage'
 import CustomerPage from './pages/CustomerPage'
@@ -138,6 +139,13 @@ export default function AnalyticsApp() {
     [allLoads]
   )
 
+  const customerGroups: OptionGroup[] = [
+    {
+      label: 'HALO WATER SYSTEMS (All)',
+      match: (o) => /halo water|hydronix water/i.test(o),
+    },
+  ]
+
   return (
     <Ctx.Provider value={{ allLoads, filteredLoads, filters, setFilters, loading, reload: load }}>
       {loading && (
@@ -192,6 +200,7 @@ export default function AnalyticsApp() {
                 customers={customers}
                 salesReps={salesReps}
                 branches={branches}
+                customerGroups={customerGroups}
               />
             </div>
           )}

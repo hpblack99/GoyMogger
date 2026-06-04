@@ -1,5 +1,5 @@
 import type { AnalyticsFilters } from '../lib/types'
-import MultiSelect from './MultiSelect'
+import MultiSelect, { type OptionGroup } from './MultiSelect'
 import styles from './FilterBar.module.css'
 
 interface Props {
@@ -8,6 +8,7 @@ interface Props {
   customers: string[]
   salesReps: string[]
   branches: string[]
+  customerGroups?: OptionGroup[]
 }
 
 function iso(d: Date) { return d.toISOString().slice(0, 10) }
@@ -20,7 +21,7 @@ const PRESETS = [
   { label: 'Last Year',  days: 365 },
 ]
 
-export default function FilterBar({ filters, onChange, customers, salesReps, branches }: Props) {
+export default function FilterBar({ filters, onChange, customers, salesReps, branches, customerGroups }: Props) {
   const set = (key: keyof AnalyticsFilters) => (e: React.ChangeEvent<HTMLInputElement>) =>
     onChange({ ...filters, [key]: e.target.value })
 
@@ -59,6 +60,7 @@ export default function FilterBar({ filters, onChange, customers, salesReps, bra
         value={filters.customers}
         onChange={v => onChange({ ...filters, customers: v })}
         allLabel="All Customers"
+        groups={customerGroups}
       />
       <MultiSelect
         label="Sales Rep"

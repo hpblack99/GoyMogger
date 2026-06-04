@@ -152,6 +152,40 @@
   white-space: nowrap;
 }
 
+.indeterminate {
+  background: var(--color-primary-600);
+  border-color: var(--color-primary-600);
+  opacity: 0.6;
+}
+
+.groupHeader {
+  background: var(--color-neutral-200);
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--color-neutral-800);
+  border-top: 1px solid var(--color-neutral-300);
+  padding: 7px 12px;
+}
+.groupHeader:first-child { border-top: none; }
+
+.groupLabel {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.groupCount {
+  font-size: 0.72rem;
+  color: var(--color-neutral-500);
+  white-space: nowrap;
+  margin-left: 4px;
+}
+
+.memberItem {
+  padding-left: 28px;
+}
+
 .empty {
   padding: 10px 12px;
   font-size: 0.85rem;
