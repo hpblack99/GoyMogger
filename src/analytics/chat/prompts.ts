@@ -62,7 +62,8 @@ POSTGRES RULES:
 // ── Prompt builders ───────────────────────────────────────────────────────────
 
 export function buildSqlPrompt(question: string, history: string): string {
-  return `You are a PostgreSQL analyst for FitzMark, a freight brokerage. Write ONE read-only SQL query that answers the user's question against this schema:
+  const today = new Date().toISOString().slice(0, 10)
+  return `You are a PostgreSQL analyst for FitzMark, a freight brokerage. Today's date is ${today}. Write ONE read-only SQL query that answers the user's question against this schema:
 
 ${DB_SCHEMA}
 
