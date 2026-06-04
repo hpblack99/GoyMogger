@@ -139,11 +139,11 @@ function getPeriodKey(dateStr: string, gran: TrendGranularity): string {
   const d = new Date(dateStr + 'T00:00:00')
   if (gran === 'day') return dateStr.slice(0, 10)
   if (gran === 'month') return dateStr.slice(0, 7)
-  // week: ISO week start (Monday)
-  const day = d.getDay() || 7
-  const monday = new Date(d)
-  monday.setDate(d.getDate() - day + 1)
-  return monday.toISOString().slice(0, 10)
+  // week: week starting Sunday (Sun–Sat business week)
+  const day = d.getDay() // 0=Sun, 1=Mon, ..., 6=Sat
+  const sunday = new Date(d)
+  sunday.setDate(d.getDate() - day)
+  return sunday.toISOString().slice(0, 10)
 }
 
 export function calcTrend(loads: Load[], gran: TrendGranularity): TrendPoint[] {
