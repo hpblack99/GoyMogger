@@ -53,7 +53,22 @@ POSTGRES RULES:
 - date - date returns INTEGER days, NOT an interval. Use it directly as a number.
   WRONG: EXTRACT(DAY FROM CURRENT_DATE - some_date)
   RIGHT: (CURRENT_DATE - some_date) -- already an integer
-- Time ranges: use booked_date with INTERVAL, e.g. WHERE booked_date >= CURRENT_DATE - INTERVAL '2 months'
+- NEVER use INTERVAL for relative date ranges — use integer subtraction instead.
+  This ensures your numbers match the dashboard exactly.
+  WRONG: booked_date >= CURRENT_DATE - INTERVAL '1 month'
+  RIGHT:  booked_date >= CURRENT_DATE - 30
+
+DATE RANGE DEFINITIONS (must match these exactly — do not deviate):
+  "today"          → booked_date = CURRENT_DATE
+  "last week"      → booked_date >= CURRENT_DATE - 7
+  "last month"     → booked_date >= CURRENT_DATE - 30
+  "last 3 months"  → booked_date >= CURRENT_DATE - 90
+  "last 6 months"  → booked_date >= CURRENT_DATE - 180
+  "last year"      → booked_date >= CURRENT_DATE - 365
+  "this month"     → booked_date >= DATE_TRUNC('month', CURRENT_DATE)
+  "this year"      → booked_date >= DATE_TRUNC('year',  CURRENT_DATE)
+  All ranges are inclusive of today: no upper bound needed unless specified.
+
 - NEVER use quote_orig_profit, quote_current_profit, or any quote_* column when the question is about actual profit/revenue.
 - "discount" = quote_orig_rev - load_revenue (when positive).
 - Dates are ISO (YYYY-MM-DD). Always filter on booked_date for time ranges.
@@ -75,7 +90,7 @@ RULES:
 - NEVER use INSERT, UPDATE, DELETE, DROP, TRUNCATE, ALTER, CREATE, or any DDL/DML. Read-only only.
 - Reference only the tables/columns above.
 - For any revenue/profit/margin question ALWAYS use load_revenue and load_profit. NEVER use quote_orig_profit, quote_current_profit, or manually compute revenue - expenses. load_profit is the authoritative profit column.
-- Always filter on booked_date for date ranges. Use INTERVAL syntax: booked_date >= CURRENT_DATE - INTERVAL '2 months'.
+- Always filter on booked_date for date ranges. Use integer subtraction: booked_date >= CURRENT_DATE - 30 (not INTERVAL).
 
 NAME MATCHING (critical):
 - People (sales reps, account reps, dispatchers) live in: sales_rep, account_rep, dispatch_rep, quote_creator.
