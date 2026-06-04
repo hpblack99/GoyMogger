@@ -1,9 +1,11 @@
-.page { display: flex; flex-direction: column; gap: 24px; }
+.page { display: flex; flex-direction: column; gap: 20px; }
 
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .title {
@@ -12,43 +14,118 @@
   color: var(--color-neutral-900);
 }
 
-.granToggle { display: flex; gap: 8px; }
-
-.toggleBtn {
-  padding: 6px 16px;
-  border-radius: 8px;
-  border: 1px solid var(--color-neutral-300);
-  background: transparent;
-  color: var(--color-neutral-600);
-  font-size: 0.85rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.toggleBtn:hover {
+/* Granularity toggle */
+.granToggle {
+  display: flex;
   background: var(--color-neutral-200);
-  color: var(--color-neutral-800);
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--color-neutral-300);
 }
 
-.toggleBtn.active {
-  background: var(--color-primary-600);
-  border-color: var(--color-primary-600);
-  color: #fff;
-}
-
-.chartCard {
-  background: var(--color-neutral-100);
-  border: 1px solid var(--color-neutral-200);
-  border-radius: 12px;
-  padding: 16px 20px;
-}
-
-.chartTitle {
+.granBtn {
+  background: none;
+  border: none;
+  padding: 5px 14px;
   font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-neutral-500);
+  cursor: pointer;
+  transition: all 0.1s;
+}
+.granBtn:hover { color: var(--color-neutral-700); }
+.granActive {
+  background: var(--color-primary-600) !important;
+  color: #fff !important;
+  font-weight: 700;
+}
+
+/* Controls row */
+.controls {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.controlGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.controlLabel {
+  font-size: 0.72rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-neutral-500);
-  margin-bottom: 12px;
+  white-space: nowrap;
+}
+
+.pills {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--color-neutral-200);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: 20px;
+  padding: 3px 10px 3px 7px;
+  font-size: 0.75rem;
+  color: var(--color-neutral-500);
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+.pill:hover { border-color: var(--color-neutral-500); color: var(--color-neutral-700); }
+.pillOn { font-weight: 600; }
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Chart card */
+.chartCard {
+  background: var(--color-neutral-100);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 12px;
+  padding: 16px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Dash-pattern legend */
+.dashLegend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+  border-top: 1px solid var(--color-neutral-200);
+}
+
+.dashItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--color-neutral-500);
+}
+
+.dashNote {
+  font-size: 0.7rem;
+  color: var(--color-neutral-400);
+  font-style: italic;
+  margin-left: auto;
 }
