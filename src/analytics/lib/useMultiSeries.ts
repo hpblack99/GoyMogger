@@ -4,10 +4,32 @@ import type { Load } from './types'
 import type { TrendGranularity } from './calculations'
 import type { AnalyticsFilters } from './types'
 
-export const SERIES_COLORS = [
-  '#22c55e', '#06b6d4', '#f59e0b', '#a78bfa',
-  '#f472b6', '#fb923c', '#34d399', '#60a5fa',
+// Colors reserved exclusively for GROSS / combined series in charts
+export const GROSS_COLORS = {
+  revenue: '#22c55e',  // green
+  profit:  '#a78bfa',  // violet
+  margin:  '#06b6d4',  // cyan
+  loads:   '#f59e0b',  // amber
+  revPerLoad:    '#34d399', // emerald
+  profitPerLoad: '#818cf8', // indigo
+}
+
+// Colors for individual entity overlay lines — never overlap with GROSS_COLORS
+export const ENTITY_COLORS = [
+  '#f472b6', // pink
+  '#fb923c', // orange
+  '#60a5fa', // blue
+  '#e879f9', // fuchsia
+  '#f87171', // coral
+  '#2dd4bf', // teal
+  '#a3e635', // lime
+  '#fbbf24', // yellow
+  '#c084fc', // purple-light
+  '#38bdf8', // sky
 ]
+
+// Keep SERIES_COLORS as alias so existing callers don't break
+export const SERIES_COLORS = ENTITY_COLORS
 
 /** Detect which filter dimension has multiple values selected, in priority order. */
 export function getMultiDimension(filters: AnalyticsFilters) {

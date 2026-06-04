@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAnalytics } from '../AnalyticsApp'
 
 import type { TrendGranularity } from '../lib/calculations'
-import { useMultiTrend, SERIES_COLORS } from '../lib/useMultiSeries'
+import { useMultiTrend, ENTITY_COLORS, GROSS_COLORS } from '../lib/useMultiSeries'
 import TrendChart from '../components/TrendChart'
 import type { EntityGroup } from '../components/TrendChart'
 import styles from './TrendsPage.module.css'
@@ -21,7 +21,7 @@ export default function TrendsPage() {
   const mkGroups = (seriesFn: (key: string) => EntityGroup['series']): EntityGroup[] =>
     multiKeys.map((key, i) => ({
       label: key,
-      color: SERIES_COLORS[(i + 1) % SERIES_COLORS.length],
+      color: ENTITY_COLORS[i % ENTITY_COLORS.length],
       series: seriesFn(key),
     }))
 
@@ -41,25 +41,25 @@ export default function TrendsPage() {
   ])
 
   const revProfitGross = multi ? [
-    { dataKey: 'gross_revenue', name: 'Revenue (Gross)', color: '#22c55e', shape: 'bar'  as const },
-    { dataKey: 'gross_profit',  name: 'Profit (Gross)',  color: '#06b6d4', shape: 'bar'  as const },
-    { dataKey: 'gross_margin',  name: 'Margin (Gross)',  color: '#f59e0b', shape: 'line' as const, rightAxis: true },
+    { dataKey: 'gross_revenue', name: 'Revenue (Gross)', color: GROSS_COLORS.revenue, shape: 'bar'  as const },
+    { dataKey: 'gross_profit',  name: 'Profit (Gross)',  color: GROSS_COLORS.profit,  shape: 'bar'  as const },
+    { dataKey: 'gross_margin',  name: 'Margin (Gross)',  color: GROSS_COLORS.margin,  shape: 'line' as const, rightAxis: true },
   ] : [
-    { dataKey: 'revenue', name: 'Revenue', color: '#22c55e', shape: 'bar'  as const },
-    { dataKey: 'profit',  name: 'Profit',  color: '#06b6d4', shape: 'bar'  as const },
-    { dataKey: 'margin',  name: 'Margin',  color: '#f59e0b', shape: 'line' as const, rightAxis: true },
+    { dataKey: 'revenue', name: 'Revenue', color: GROSS_COLORS.revenue, shape: 'bar'  as const },
+    { dataKey: 'profit',  name: 'Profit',  color: GROSS_COLORS.profit,  shape: 'bar'  as const },
+    { dataKey: 'margin',  name: 'Margin',  color: GROSS_COLORS.margin,  shape: 'line' as const, rightAxis: true },
   ]
 
   const loadGross = multi
-    ? [{ dataKey: 'gross_loadCount', name: 'Loads (Gross)', color: '#8b5cf6', shape: 'bar' as const }]
-    : [{ dataKey: 'loadCount', name: 'Loads', color: '#8b5cf6', shape: 'bar' as const }]
+    ? [{ dataKey: 'gross_loadCount', name: 'Loads (Gross)', color: GROSS_COLORS.loads, shape: 'bar' as const }]
+    : [{ dataKey: 'loadCount', name: 'Loads', color: GROSS_COLORS.loads, shape: 'bar' as const }]
 
   const perLoadGross = multi ? [
-    { dataKey: 'gross_revenuePerLoad',  name: 'Rev/Load (Gross)',    color: '#22c55e', shape: 'line' as const },
-    { dataKey: 'gross_profitPerLoad',   name: 'Profit/Load (Gross)', color: '#06b6d4', shape: 'line' as const },
+    { dataKey: 'gross_revenuePerLoad',  name: 'Rev/Load (Gross)',    color: GROSS_COLORS.revPerLoad,    shape: 'line' as const },
+    { dataKey: 'gross_profitPerLoad',   name: 'Profit/Load (Gross)', color: GROSS_COLORS.profitPerLoad, shape: 'line' as const },
   ] : [
-    { dataKey: 'revenuePerLoad',  name: 'Rev / Load',    color: '#22c55e', shape: 'line' as const },
-    { dataKey: 'profitPerLoad',   name: 'Profit / Load', color: '#06b6d4', shape: 'line' as const },
+    { dataKey: 'revenuePerLoad',  name: 'Rev / Load',    color: GROSS_COLORS.revPerLoad,    shape: 'line' as const },
+    { dataKey: 'profitPerLoad',   name: 'Profit / Load', color: GROSS_COLORS.profitPerLoad, shape: 'line' as const },
   ]
 
   const granLabel = gran.charAt(0).toUpperCase() + gran.slice(1)

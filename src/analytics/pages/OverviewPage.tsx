@@ -3,7 +3,7 @@ import { useAnalytics } from '../AnalyticsApp'
 import { calcPeriodKPIs, fmt } from '../lib/calculations'
 import { generateAlerts } from '../lib/alerts'
 import { calcEntitySummaries } from '../lib/calculations'
-import { useMultiTrend, SERIES_COLORS } from '../lib/useMultiSeries'
+import { useMultiTrend, ENTITY_COLORS, GROSS_COLORS } from '../lib/useMultiSeries'
 import KPICard from '../components/KPICard'
 import TrendChart from '../components/TrendChart'
 import type { EntityGroup } from '../components/TrendChart'
@@ -35,43 +35,43 @@ export default function OverviewPage() {
 
   const marginEntityGroups: EntityGroup[] = multiKeys.map((key, i) => ({
     label: key,
-    color: SERIES_COLORS[(i + 1) % SERIES_COLORS.length],
+    color: ENTITY_COLORS[i % ENTITY_COLORS.length],
     series: [{ dataKey: `margin_${key}`, name: 'Margin', shape: 'line' as const }],
   }))
 
   const loadEntityGroups: EntityGroup[] = multiKeys.map((key, i) => ({
     label: key,
-    color: SERIES_COLORS[(i + 1) % SERIES_COLORS.length],
+    color: ENTITY_COLORS[i % ENTITY_COLORS.length],
     series: [{ dataKey: `loads_${key}`, name: 'Loads', shape: 'line' as const }],
   }))
 
   const revEntityGroups: EntityGroup[] = multiKeys.map((key, i) => ({
     label: key,
-    color: SERIES_COLORS[(i + 1) % SERIES_COLORS.length],
+    color: ENTITY_COLORS[i % ENTITY_COLORS.length],
     series: [{ dataKey: `rev_${key}`, name: 'Revenue', shape: 'line' as const }],
   }))
 
   const profitEntityGroups: EntityGroup[] = multiKeys.map((key, i) => ({
     label: key,
-    color: SERIES_COLORS[(i + 1) % SERIES_COLORS.length],
+    color: ENTITY_COLORS[i % ENTITY_COLORS.length],
     series: [{ dataKey: `profit_${key}`, name: 'Profit', shape: 'line' as const }],
   }))
 
   const revGrossSeries = multi
-    ? [{ dataKey: 'gross_revenue', name: 'Gross Revenue', color: '#22c55e', shape: 'area' as const, dashed: true }]
-    : [{ dataKey: 'revenue',       name: 'Revenue',       color: '#22c55e', shape: 'area' as const }]
+    ? [{ dataKey: 'gross_revenue', name: 'Revenue (Gross)', color: GROSS_COLORS.revenue, shape: 'area' as const, dashed: true }]
+    : [{ dataKey: 'revenue',       name: 'Revenue',         color: GROSS_COLORS.revenue, shape: 'area' as const }]
 
   const profitGrossSeries = multi
-    ? [{ dataKey: 'gross_profit', name: 'Gross Profit', color: '#a78bfa', shape: 'area' as const, dashed: true }]
-    : [{ dataKey: 'profit',       name: 'Profit',       color: '#a78bfa', shape: 'area' as const }]
+    ? [{ dataKey: 'gross_profit', name: 'Profit (Gross)', color: GROSS_COLORS.profit, shape: 'area' as const, dashed: true }]
+    : [{ dataKey: 'profit',       name: 'Profit',         color: GROSS_COLORS.profit, shape: 'area' as const }]
 
   const marginGrossSeries = multi
-    ? [{ dataKey: 'gross_margin', name: 'Gross Margin', color: '#06b6d4', shape: 'line' as const, dashed: true }]
-    : [{ dataKey: 'margin',       name: 'Margin %',     color: '#06b6d4', shape: 'line' as const }]
+    ? [{ dataKey: 'gross_margin', name: 'Margin (Gross)', color: GROSS_COLORS.margin, shape: 'line' as const, dashed: true }]
+    : [{ dataKey: 'margin',       name: 'Margin %',       color: GROSS_COLORS.margin, shape: 'line' as const }]
 
   const loadGrossSeries = multi
-    ? [{ dataKey: 'gross_loadCount', name: 'Gross Loads', color: '#8b5cf6', shape: 'bar' as const, dashed: true }]
-    : [{ dataKey: 'loadCount',       name: 'Loads',       color: '#8b5cf6', shape: 'bar' as const }]
+    ? [{ dataKey: 'gross_loadCount', name: 'Loads (Gross)', color: GROSS_COLORS.loads, shape: 'bar' as const, dashed: true }]
+    : [{ dataKey: 'loadCount',       name: 'Loads',         color: GROSS_COLORS.loads, shape: 'bar' as const }]
 
   return (
     <div className={styles.page}>
