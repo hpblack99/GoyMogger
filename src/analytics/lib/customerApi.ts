@@ -31,12 +31,24 @@ export interface RfpBid {
 }
 
 export async function fetchCustomers(): Promise<CustomerRecord[]> {
-  const { data, error } = await supabase
-    .from('customers')
-    .select('*')
-    .order('name')
-  if (error) throw error
-  return data as CustomerRecord[]
+  // Page through all rows — Supabase caps each response at 1000 rows by default,
+  // and the customers table can exceed that, silently dropping records otherwise.
+  const PAGE = 1000
+  const all: CustomerRecord[] = []
+  let from = 0
+  while (true) {
+    const { data, error } = await supabase
+      .from('customers')
+      .select('*')
+      .order('name')
+      .range(from, from + PAGE - 1)
+    if (error) throw error
+    if (!data || data.length === 0) break
+    all.push(...(data as CustomerRecord[]))
+    if (data.length < PAGE) break
+    from += PAGE
+  }
+  return all
 }
 
 export async function fetchCustomerGroups(): Promise<CustomerGroup[]> {
