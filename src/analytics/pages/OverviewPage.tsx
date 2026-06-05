@@ -4,7 +4,7 @@ import { calcPeriodKPIs, fmt } from '../lib/calculations'
 import { generateAlerts } from '../lib/alerts'
 import { calcEntitySummaries } from '../lib/calculations'
 import { useMultiTrend, ENTITY_COLORS, GROSS_COLORS } from '../lib/useMultiSeries'
-import KPICard from '../components/KPICard'
+import KpiDashboard from '../components/KpiDashboard'
 import TrendChart from '../components/TrendChart'
 import type { EntityGroup } from '../components/TrendChart'
 import styles from './OverviewPage.module.css'
@@ -86,16 +86,10 @@ export default function OverviewPage() {
         </div>
       )}
 
-      <div className={styles.kpiGrid}>
-        <KPICard label="Revenue"          value={fmt.dollar(kpis.revenue)}        change={period.changes.revenue}        accent />
-        <KPICard label="Profit"           value={fmt.dollar(kpis.profit)}         change={period.changes.profit}         />
-        <KPICard label="Margin"           value={fmt.pct(kpis.margin)}            change={period.changes.margin}         />
-        <KPICard label="Loads"            value={fmt.num(kpis.loadCount)}         change={period.changes.loadCount}      />
-        <KPICard label="Revenue / Load"   value={fmt.dollar(kpis.revenuePerLoad)} change={period.changes.revenuePerLoad} />
-        <KPICard label="Profit / Load"    value={fmt.dollar(kpis.profitPerLoad)}  change={period.changes.profitPerLoad}  />
-        <KPICard label="Active Customers" value={fmt.num(kpis.activeCustomers)}   change={period.changes.activeCustomers}/>
-        <KPICard label="Active Reps"      value={fmt.num(kpis.activeSalesReps)}   change={period.changes.activeSalesReps}/>
-      </div>
+      <KpiDashboard
+        loads={filteredLoads}
+        metrics={['loadCount', 'revenue', 'cost', 'profit', 'margin', 'revenuePerLoad', 'profitPerLoad', 'activeCustomers', 'activeSalesReps', 'activeCarriers']}
+      />
 
       <div className={styles.charts}>
         <TrendChart
