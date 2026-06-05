@@ -308,6 +308,7 @@ export default function CustomerPage() {
   const totalLoads  = summaries.reduce((s, x) => s + x.loadCount, 0)
   const totalRev    = summaries.reduce((s, x) => s + x.revenue,   0)
   const totalProfit = summaries.reduce((s, x) => s + x.profit,    0)
+  const totalCost   = summaries.reduce((s, x) => s + x.cost,      0)
   const totalMargin = totalRev > 0 ? (totalProfit / totalRev) * 100 : 0
   const footerCells = [
     'TOTAL',
@@ -407,21 +408,28 @@ export default function CustomerPage() {
         <button className={styles.expandBtn} onClick={() => setExpanded(true)}>⛶ Open Analysis</button>
       </div>
 
-      {/* ── KPI cards ──────────────────────────────────────────────────────── */}
-      <div className={styles.kpiGrid}>
-        {([
-          { label: 'Active Carriers', value: fmt.num(activeCarriers),           pct: null },
-          { label: 'Total Revenue',   value: fmt.dollar(period.current.revenue), pct: period.changes.revenue },
-          { label: 'Total GP',        value: fmt.dollar(period.current.profit),  pct: period.changes.profit },
-          { label: 'Total Loads',     value: fmt.num(period.current.loadCount),  pct: period.changes.loadCount },
-          { label: 'Avg Margin',      value: fmt.pct(period.current.margin),     pct: period.changes.margin },
-        ] as { label: string; value: string; pct: number | null }[]).map(card => (
-          <div key={card.label} className={styles.kpiCard}>
-            <div className={styles.kpiLabel}>{card.label}</div>
-            <div className={styles.kpiValue}>{card.value}</div>
-            {card.pct !== null ? <TrendPct pct={card.pct} /> : <div className={styles.kpiSub}>&nbsp;</div>}
-          </div>
-        ))}
+      {/* ── Dashboard ──────────────────────────────────────────────────────── */}
+      <div className={styles.dashboardSection}>
+        <div className={styles.dashboardLabel}>Dashboard</div>
+        <div className={styles.kpiGrid}>
+          {([
+            { label: 'Customers',       value: fmt.num(summaries.length),          pct: null },
+            { label: 'Active Carriers', value: fmt.num(activeCarriers),            pct: null },
+            { label: 'Total Loads',     value: fmt.num(totalLoads),                pct: period.changes.loadCount },
+            { label: 'Total Revenue',   value: fmt.dollar(totalRev),               pct: period.changes.revenue },
+            { label: 'Total Expense',   value: fmt.dollar(totalCost),              pct: null },
+            { label: 'Total GP',        value: fmt.dollar(totalProfit),            pct: period.changes.profit },
+            { label: 'Avg Margin',      value: fmt.pct(totalMargin),               pct: period.changes.margin },
+            { label: 'Rev / Load',      value: fmt.dollar(totalRev    / Math.max(totalLoads, 1)), pct: null },
+            { label: 'GP / Load',       value: fmt.dollar(totalProfit / Math.max(totalLoads, 1)), pct: null },
+          ] as { label: string; value: string; pct: number | null }[]).map(card => (
+            <div key={card.label} className={styles.kpiCard}>
+              <div className={styles.kpiLabel}>{card.label}</div>
+              <div className={styles.kpiValue}>{card.value}</div>
+              {card.pct !== null ? <TrendPct pct={card.pct} /> : <div className={styles.kpiSub}>&nbsp;</div>}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* ── Data table with pagination + grand total ──────────────────────── */}

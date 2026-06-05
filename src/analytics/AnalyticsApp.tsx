@@ -174,6 +174,10 @@ export default function AnalyticsApp() {
       label: 'PVI/WATTS/LYNC',
       match: (o) => /pvi/i.test(o),
     },
+    {
+      label: 'Wright Printing',
+      match: (o) => /^wrights? printing/i.test(o),
+    },
   ]
 
   return (

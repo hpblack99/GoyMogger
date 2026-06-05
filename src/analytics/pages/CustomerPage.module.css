@@ -18,11 +18,26 @@
   margin: 0;
 }
 
+/* ── Dashboard ── */
+.dashboardSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dashboardLabel {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-neutral-500);
+}
+
 /* ── KPI cards ── */
 .kpiGrid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 10px;
 }
 
 .kpiCard {
