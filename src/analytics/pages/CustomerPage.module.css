@@ -1,0 +1,361 @@
+.page {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-neutral-50);
+  margin: 0;
+}
+
+/* ── KPI cards ── */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+
+.kpiCard {
+  background: var(--color-neutral-800);
+  border: 1px solid var(--color-neutral-700);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kpiLabel {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-neutral-400);
+}
+
+.kpiValue {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-neutral-50);
+  line-height: 1.2;
+}
+
+.kpiSub {
+  font-size: 0.72rem;
+  color: var(--color-neutral-500);
+  min-height: 1em;
+}
+
+.trendUp   { font-size: 0.72rem; color: #4ade80; font-weight: 600; }
+.trendDown { font-size: 0.72rem; color: #f87171; font-weight: 600; }
+.trendFlat { font-size: 0.72rem; color: var(--color-neutral-500); }
+
+/* ── Chart card ── */
+.chartCard {
+  background: var(--color-neutral-800);
+  border: 1px solid var(--color-neutral-700);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.chartHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.chartTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-neutral-200);
+}
+
+.expandBtn {
+  background: transparent;
+  border: 1px solid var(--color-neutral-600);
+  border-radius: 6px;
+  color: var(--color-neutral-400);
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.expandBtn:hover {
+  border-color: var(--color-neutral-400);
+  color: var(--color-neutral-200);
+}
+
+/* ── Full-screen overlay ── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.72);
+  z-index: 9000;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 12px;
+}
+
+.modal {
+  background: var(--color-neutral-900);
+  border: 1px solid var(--color-neutral-700);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 1400px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 16px;
+  gap: 12px;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.modalTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-neutral-50);
+  flex: 1;
+}
+
+.modalControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Mode toggle (Gross / Trend) ── */
+.modeToggle {
+  display: flex;
+  border: 1px solid var(--color-neutral-700);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.modeBtn {
+  background: transparent;
+  border: none;
+  color: var(--color-neutral-400);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.modeBtn:hover { background: var(--color-neutral-700); color: var(--color-neutral-200); }
+.modeBtnOn {
+  background: var(--color-neutral-700);
+  color: var(--color-neutral-50);
+}
+
+/* ── Granularity toggle ── */
+.granToggle {
+  display: flex;
+  border: 1px solid var(--color-neutral-700);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.granBtn {
+  background: transparent;
+  border: none;
+  color: var(--color-neutral-400);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.granBtn:hover { background: var(--color-neutral-700); color: var(--color-neutral-200); }
+.granActive {
+  background: var(--color-neutral-700);
+  color: var(--color-neutral-50);
+}
+
+/* ── Delta compare button ── */
+.deltaBtn {
+  background: transparent;
+  border: 1px solid #3b82f6;
+  color: #60a5fa;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.deltaBtn:hover { background: rgba(59,130,246,0.12); }
+.deltaBtnOn {
+  background: rgba(59,130,246,0.18);
+  border-color: #60a5fa;
+}
+
+.closeBtn {
+  background: transparent;
+  border: 1px solid var(--color-neutral-700);
+  color: var(--color-neutral-400);
+  font-size: 0.85rem;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.closeBtn:hover { background: var(--color-neutral-700); color: var(--color-neutral-200); }
+
+/* ── KPI / entity pill controls ── */
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.controlGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.controlLabel {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-neutral-500);
+  min-width: 48px;
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: 1px solid var(--color-neutral-700);
+  border-radius: 20px;
+  color: var(--color-neutral-400);
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 3px 10px 3px 8px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.pill:hover { background: var(--color-neutral-800); color: var(--color-neutral-200); }
+.pillOn { border-color: currentColor; }
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Chart + delta layout ── */
+.chartWithDelta {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Delta box ── */
+.deltaBox {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(22,27,34,0.95);
+  border: 1px solid var(--color-neutral-700);
+  border-radius: 10px;
+  padding: 10px 14px;
+  min-width: 210px;
+  z-index: 10;
+  backdrop-filter: blur(4px);
+}
+
+.deltaHeader {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-neutral-300);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.deltaArrow {
+  color: var(--color-neutral-500);
+  margin: 0 2px;
+}
+
+.deltaRows {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.deltaRow {
+  display: grid;
+  grid-template-columns: 8px 1fr auto auto;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+}
+
+.deltaKpiDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.deltaKpiLabel {
+  color: var(--color-neutral-400);
+}
+
+.deltaChange {
+  font-weight: 600;
+  text-align: right;
+}
+
+.deltaPct {
+  font-weight: 600;
+  text-align: right;
+  min-width: 44px;
+}
+
+.deltaPos { color: #4ade80; }
+.deltaNeg { color: #f87171; }
+
+.deltaHintTop {
+  font-size: 0.72rem;
+  color: #60a5fa;
+  font-weight: 600;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
