@@ -242,7 +242,7 @@ export default function TrendsPage() {
   const tickFmt  = gran === 'week' ? fmt.weekRangeTick  : fmt.dateTick
   const labelFmt = gran === 'week' ? fmt.weekRangeLabel : fmt.date
 
-  function renderChart(height: number, interactive: boolean) {
+  function renderChart(height: number | string, interactive: boolean) {
     return (
       <ResponsiveContainer width="100%" height={height}>
         <ComposedChart
@@ -485,7 +485,7 @@ export default function TrendsPage() {
 
             {/* Chart + delta box */}
             <div className={styles.chartWithDelta}>
-              {renderChart(560, true)}
+              {renderChart('100%', true)}
               <DeltaBox />
             </div>
 

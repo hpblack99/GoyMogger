@@ -5,6 +5,12 @@
   gap: 20px;
 }
 
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .title {
   font-size: 1.25rem;
   font-weight: 700;
@@ -54,34 +60,15 @@
 .trendDown { font-size: 0.72rem; color: #f87171; font-weight: 600; }
 .trendFlat { font-size: 0.72rem; color: var(--color-neutral-500); }
 
-/* ── Chart card ── */
-.chartCard {
-  background: var(--color-neutral-100);
-  border: 1px solid var(--color-neutral-200);
-  border-radius: 10px;
-  padding: 16px;
-}
-
-.chartHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.chartTitle {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--color-neutral-700);
-}
-
+/* ── Open Analysis button ── */
 .expandBtn {
   background: none;
   border: 1px solid var(--color-neutral-300);
   border-radius: 6px;
   color: var(--color-neutral-500);
-  font-size: 0.75rem;
-  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 6px 14px;
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s;
 }
@@ -122,7 +109,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.72);
+  background: rgba(0,0,0,0.82);
   z-index: 9000;
   display: flex;
   align-items: stretch;
@@ -130,17 +117,18 @@
   padding: 12px;
 }
 
+/* Modal fills viewport, no scroll — chart flexes to fill remaining space */
 .modal {
   background: var(--color-neutral-100);
   border: 1px solid var(--color-neutral-200);
   border-radius: 12px;
   width: 100%;
-  max-width: 1400px;
+  max-width: 1600px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 16px;
-  gap: 12px;
+  padding: 16px 20px;
+  gap: 10px;
 }
 
 .modalHeader {
@@ -164,7 +152,15 @@
   flex-wrap: wrap;
 }
 
-/* ── Mode toggle (Gross / Trend) ── */
+/* FilterBar inside modal */
+.modalFilters {
+  flex-shrink: 0;
+  border-radius: 8px;
+  border: 1px solid var(--color-neutral-200);
+  background: var(--color-neutral-150, #161b22);
+}
+
+/* ── Mode toggle (Trend / Gross) ── */
 .modeToggle {
   display: flex;
   border: 1px solid var(--color-neutral-300);
@@ -178,7 +174,7 @@
   color: var(--color-neutral-500);
   font-size: 0.78rem;
   font-weight: 600;
-  padding: 5px 12px;
+  padding: 5px 14px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
@@ -188,7 +184,7 @@
   color: var(--color-neutral-900);
 }
 
-/* ── Granularity toggle ── */
+/* ── Granularity / TopN / metric toggles ── */
 .granToggle {
   display: flex;
   border: 1px solid var(--color-neutral-300);
@@ -266,7 +262,7 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-neutral-500);
-  min-width: 48px;
+  min-width: 60px;
 }
 
 .pills {
@@ -299,7 +295,7 @@
   flex-shrink: 0;
 }
 
-/* ── Chart + delta layout ── */
+/* ── Chart fills remaining space ── */
 .chartWithDelta {
   flex: 1;
   min-height: 0;
@@ -358,20 +354,10 @@
   flex-shrink: 0;
 }
 
-.deltaKpiLabel {
-  color: var(--color-neutral-500);
-}
+.deltaKpiLabel { color: var(--color-neutral-500); }
 
-.deltaChange {
-  font-weight: 600;
-  text-align: right;
-}
-
-.deltaPct {
-  font-weight: 600;
-  text-align: right;
-  min-width: 44px;
-}
+.deltaChange { font-weight: 600; text-align: right; }
+.deltaPct    { font-weight: 600; text-align: right; min-width: 44px; }
 
 .deltaPos { color: #4ade80; }
 .deltaNeg { color: #f87171; }
