@@ -288,12 +288,20 @@ export default function CustomerPage() {
     [filteredLoads]
   )
 
-  const entityFilteredLoads = useMemo(() => allLoads.filter(l => {
-    if (filters.customers.length > 0 && !filters.customers.includes(l.customer_name ?? '')) return false
-    if (filters.salesReps.length > 0 && !filters.salesReps.includes(l.sales_rep ?? ''))     return false
-    if (filters.branches.length  > 0 && !filters.branches.includes(l.branch_name ?? ''))    return false
-    return true
-  }), [allLoads, filters])
+  const entityFilteredLoads = useMemo(() => {
+    const customerSet = filters.customers.length > 0
+      ? new Set(filters.customers.map(c => c.trim().toLowerCase())) : null
+    const repSet = filters.salesReps.length > 0
+      ? new Set(filters.salesReps.map(r => r.trim().toLowerCase())) : null
+    const branchSet = filters.branches.length > 0
+      ? new Set(filters.branches.map(b => b.trim().toLowerCase())) : null
+    return allLoads.filter(l => {
+      if (customerSet && !customerSet.has((l.customer_name ?? '').trim().toLowerCase())) return false
+      if (repSet      && !repSet.has((l.sales_rep ?? '').trim().toLowerCase()))          return false
+      if (branchSet   && !branchSet.has((l.branch_name ?? '').trim().toLowerCase()))     return false
+      return true
+    })
+  }, [allLoads, filters])
 
   const period = useMemo(() =>
     calcPeriodKPIs(entityFilteredLoads, filters.dateFrom, filters.dateTo),
