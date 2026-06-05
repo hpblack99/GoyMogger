@@ -1,6 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAnalytics } from '../AnalyticsApp'
+import { syncCustomersFromLoads } from '../lib/customerApi'
 import styles from './UploadPage.module.css'
 
 type WorkerMsg =
@@ -80,6 +81,7 @@ export default function UploadPage() {
         setStatus('done')
         setMessage(`Done! ${done.toLocaleString()} loads upserted (new + updated).`)
         reload()
+        syncCustomersFromLoads().catch(() => {}) // best-effort; non-blocking
       }
     }
 

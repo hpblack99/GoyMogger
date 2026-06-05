@@ -11,6 +11,7 @@ import FilterBar from '../components/FilterBar'
 import DataTable from '../components/DataTable'
 import type { EntitySummary } from '../lib/types'
 import type { Column } from '../components/DataTable'
+import CustomerSettingsModal from '../components/CustomerSettingsModal'
 import styles from './CustomerPage.module.css'
 
 // ── KPI definitions ───────────────────────────────────────────────────────────
@@ -75,15 +76,25 @@ function consolidateSummaries(summaries: EntitySummary[], groups: OptionGroup[])
 }
 const TOP_N_OPTIONS = [5, 10, 15, 20] as const
 
-const COLS: Column<EntitySummary>[] = [
-  { key: 'name',           header: 'Customer' },
-  { key: 'loadCount',      header: 'Loads',       align: 'right', render: r => fmt.num(r.loadCount) },
-  { key: 'revenue',        header: 'Revenue',     align: 'right', render: r => fmt.dollar(r.revenue) },
-  { key: 'profit',         header: 'Profit',      align: 'right', render: r => fmt.dollar(r.profit) },
-  { key: 'margin',         header: 'Margin',      align: 'right', render: r => fmt.pct(r.margin) },
-  { key: 'revenuePerLoad', header: 'Rev/Load',    align: 'right', render: r => fmt.dollar(r.revenuePerLoad) },
-  { key: 'profitPerLoad',  header: 'Profit/Load', align: 'right', render: r => fmt.dollar(r.profitPerLoad) },
-]
+function makeCols(onSettings: (name: string) => void): Column<EntitySummary>[] {
+  return [
+    { key: 'name',           header: 'Customer' },
+    { key: 'loadCount',      header: 'Loads',       align: 'right', render: r => fmt.num(r.loadCount) },
+    { key: 'revenue',        header: 'Revenue',     align: 'right', render: r => fmt.dollar(r.revenue) },
+    { key: 'profit',         header: 'Profit',      align: 'right', render: r => fmt.dollar(r.profit) },
+    { key: 'margin',         header: 'Margin',      align: 'right', render: r => fmt.pct(r.margin) },
+    { key: 'revenuePerLoad', header: 'Rev/Load',    align: 'right', render: r => fmt.dollar(r.revenuePerLoad) },
+    { key: 'profitPerLoad',  header: 'Profit/Load', align: 'right', render: r => fmt.dollar(r.profitPerLoad) },
+    {
+      key: '_settings', header: '',
+      render: r => (
+        <button className={styles.settingsBtn} onClick={e => { e.stopPropagation(); onSettings(r.name) }} title="Customer settings">
+          ⚙
+        </button>
+      ),
+    },
+  ]
+}
 
 // ── Recharts helpers ──────────────────────────────────────────────────────────
 
@@ -136,6 +147,7 @@ export default function CustomerPage() {
 
   // Table pagination
   const [page, setPage] = useState(0)
+  const [settingsCustomer, setSettingsCustomer] = useState<string | null>(null)
 
   // Expand state
   const [expanded, setExpanded]     = useState(false)
@@ -414,9 +426,12 @@ export default function CustomerPage() {
 
       {/* ── Data table with pagination + grand total ──────────────────────── */}
       <DataTable
-        columns={COLS} rows={pageRows} rowKey={r => r.name}
+        columns={makeCols(setSettingsCustomer)} rows={pageRows} rowKey={r => r.name}
         emptyMessage="No customer data" footerCells={footerCells}
       />
+      {settingsCustomer && (
+        <CustomerSettingsModal customerName={settingsCustomer} onClose={() => setSettingsCustomer(null)} />
+      )}
       {totalPages > 1 && (
         <div className={styles.pagination}>
           <button className={styles.pageBtn} disabled={page === 0} onClick={() => setPage(p => p - 1)}>← Prev</button>

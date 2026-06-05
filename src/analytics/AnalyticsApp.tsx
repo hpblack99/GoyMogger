@@ -17,6 +17,7 @@ import AlertsPage from './pages/AlertsPage'
 import BrainstormPage from './pages/BrainstormPage'
 import ReportsPage from './pages/ReportsPage'
 import ReportEditorPage from './pages/ReportEditorPage'
+import RfpPage from './pages/RfpPage'
 import ChatBot from './chat/ChatBot'
 import FreightAnalyticsLogo from './components/FreightAnalyticsLogo'
 import styles from './AnalyticsApp.module.css'
@@ -51,6 +52,7 @@ const NAV = [
   { to: '/analytics/charges',        label: 'Charges',          icon: '⊞' },
   { to: '/analytics/discounts',      label: 'Discounts',        icon: '⊟' },
   { to: '/analytics/alerts',         label: 'Alerts',           icon: '◎' },
+  { to: '/analytics/rfp',            label: 'RFP Tracker',      icon: '◧' },
   null, // divider
   { to: '/analytics/brainstorm',     label: 'Analytics Assistant', icon: '✦' },
   { to: '/analytics/reports',        label: 'Reports',          icon: '⊡' },
@@ -229,6 +231,7 @@ export default function AnalyticsApp() {
               <Route path="charges"        element={<ChargePage />} />
               <Route path="discounts"      element={<DiscountPage />} />
               <Route path="alerts"         element={<AlertsPage />} />
+              <Route path="rfp"            element={<RfpPage />} />
               <Route path="brainstorm"     element={<BrainstormPage />} />
               <Route path="reports"        element={<ReportsPage />} />
               <Route path="reports/:id"    element={<ReportEditorPage />} />

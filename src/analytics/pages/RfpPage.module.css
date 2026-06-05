@@ -1,0 +1,350 @@
+.page {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-neutral-900);
+  margin: 0;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sectionTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-neutral-700);
+}
+
+.addBtn {
+  background: #22c55e;
+  color: #0d1117;
+  border: none;
+  border-radius: 7px;
+  padding: 6px 14px;
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.addBtn:hover {
+  opacity: 0.88;
+}
+
+/* ── Table ── */
+
+.tableWrap {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid var(--color-neutral-200);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.table thead th {
+  background: var(--color-neutral-200);
+  color: var(--color-neutral-500);
+  padding: 10px 14px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table tbody tr {
+  border-bottom: 1px solid var(--color-neutral-200);
+}
+
+.table tbody tr:nth-child(even) {
+  background: var(--color-neutral-100);
+}
+
+.table tbody tr:nth-child(odd) {
+  background: var(--color-neutral-50);
+}
+
+.table tbody tr:hover {
+  background: var(--color-neutral-200) !important;
+}
+
+.table tbody td {
+  padding: 9px 14px;
+  color: var(--color-neutral-700);
+}
+
+.right {
+  text-align: right !important;
+}
+
+/* ── Badges ── */
+
+.badge {
+  display: inline-flex;
+  border-radius: 20px;
+  padding: 2px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.badgePending {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+
+.badgeWon {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+}
+
+.badgeLost {
+  background: rgba(248, 113, 113, 0.15);
+  color: #f87171;
+}
+
+.badgeDeclined {
+  background: rgba(110, 118, 129, 0.15);
+  color: #6e7681;
+}
+
+/* ── Action buttons ── */
+
+.actionBtn {
+  background: transparent;
+  border: 1px solid var(--color-neutral-300);
+  color: var(--color-neutral-500);
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.actionBtn:hover {
+  color: var(--color-neutral-700);
+  border-color: var(--color-neutral-500);
+}
+
+.deleteBtn {
+  background: transparent;
+  border: 1px solid var(--color-neutral-300);
+  color: var(--color-neutral-500);
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.deleteBtn:hover {
+  color: #f87171;
+  border-color: #f87171;
+}
+
+/* ── Empty / loading ── */
+
+.empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--color-neutral-400);
+  font-size: 0.85rem;
+}
+
+.loading {
+  padding: 32px;
+  text-align: center;
+  color: var(--color-neutral-400);
+  font-size: 0.85rem;
+}
+
+/* ── Child account list ── */
+
+.childList {
+  font-size: 0.72rem;
+  color: var(--color-neutral-400);
+  margin-top: 2px;
+}
+
+/* ── Modal ── */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.modal {
+  background: var(--color-neutral-100);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 20px 24px 20px;
+  overflow-y: auto;
+  max-height: calc(100vh - 48px);
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.modalTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-neutral-900);
+}
+
+.deleteLink {
+  background: transparent;
+  border: none;
+  color: #f87171;
+  font-size: 0.78rem;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.formRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.formLabel {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-neutral-500);
+}
+
+.formInput {
+  background: var(--color-neutral-50);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: 6px;
+  color: var(--color-neutral-900);
+  font-size: 0.85rem;
+  padding: 7px 10px;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+.formInput:focus {
+  outline: none;
+  border-color: var(--color-neutral-500);
+}
+
+.formSelect {
+  background: var(--color-neutral-50);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: 6px;
+  color: var(--color-neutral-900);
+  font-size: 0.85rem;
+  padding: 7px 10px;
+  width: 100%;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.formSelect:focus {
+  outline: none;
+  border-color: var(--color-neutral-500);
+}
+
+.formTextarea {
+  background: var(--color-neutral-50);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: 6px;
+  color: var(--color-neutral-900);
+  font-size: 0.85rem;
+  padding: 7px 10px;
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family: inherit;
+  transition: border-color 0.15s;
+}
+.formTextarea:focus {
+  outline: none;
+  border-color: var(--color-neutral-500);
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.cancelBtn {
+  background: transparent;
+  border: 1px solid var(--color-neutral-300);
+  border-radius: 7px;
+  color: var(--color-neutral-500);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 7px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.cancelBtn:hover:not(:disabled) {
+  border-color: var(--color-neutral-500);
+  color: var(--color-neutral-700);
+}
+.cancelBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.saveBtn {
+  background: #22c55e;
+  border: none;
+  border-radius: 7px;
+  color: #0d1117;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 7px 20px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.saveBtn:hover:not(:disabled) {
+  opacity: 0.88;
+}
+.saveBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

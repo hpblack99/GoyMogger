@@ -60,6 +60,20 @@
 .trendDown { font-size: 0.72rem; color: #f87171; font-weight: 600; }
 .trendFlat { font-size: 0.72rem; color: var(--color-neutral-500); }
 
+/* ── Table settings button ── */
+.settingsBtn {
+  background: transparent;
+  border: none;
+  color: var(--color-neutral-400);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: 0.6;
+  transition: opacity 0.15s, color 0.15s;
+}
+.settingsBtn:hover { opacity: 1; color: var(--color-neutral-700); }
+
 /* ── Open Analysis button ── */
 .expandBtn {
   background: none;
