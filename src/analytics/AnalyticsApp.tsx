@@ -94,7 +94,7 @@ export default function AnalyticsApp() {
       const { data, error } = await supabase
         .from('loads')
         .select('*')
-        .order('booked_date', { ascending: false })
+        .order('scheduled_pickup_date', { ascending: false })
         .range(from, from + PAGE - 1)
       if (error || !data || data.length === 0) break
       all.push(...(data as Load[]))
@@ -110,8 +110,8 @@ export default function AnalyticsApp() {
 
   const filteredLoads = useMemo(() => {
     return allLoads.filter(l => {
-      if (filters.dateFrom && l.booked_date && l.booked_date < filters.dateFrom) return false
-      if (filters.dateTo   && l.booked_date && l.booked_date > filters.dateTo)   return false
+      if (filters.dateFrom && l.scheduled_pickup_date && l.scheduled_pickup_date < filters.dateFrom) return false
+      if (filters.dateTo   && l.scheduled_pickup_date && l.scheduled_pickup_date > filters.dateTo)   return false
       if (filters.customers.length > 0 && !filters.customers.includes(l.customer_name ?? '')) return false
       if (filters.salesReps.length > 0 && !filters.salesReps.includes(l.sales_rep ?? ''))     return false
       if (filters.branches.length  > 0 && !filters.branches.includes(l.branch_name ?? ''))    return false

@@ -89,11 +89,11 @@ export function calcPeriodKPIs(loads: Load[], dateFrom: string, dateTo: string):
   const priorFrom = new Date(priorTo.getTime() - spanMs)
 
   const current = loads.filter(l => {
-    const d = l.booked_date
+    const d = l.scheduled_pickup_date
     return d && d >= dateFrom && d <= dateTo
   })
   const prior = loads.filter(l => {
-    const d = l.booked_date
+    const d = l.scheduled_pickup_date
     const pf = priorFrom.toISOString().slice(0, 10)
     const pt = priorTo.toISOString().slice(0, 10)
     return d && d >= pf && d <= pt
@@ -147,8 +147,8 @@ function getPeriodKey(dateStr: string, gran: TrendGranularity): string {
 }
 
 export function calcTrend(loads: Load[], gran: TrendGranularity): TrendPoint[] {
-  const validLoads = loads.filter(l => l.booked_date)
-  const groups = groupBy(validLoads, l => getPeriodKey(l.booked_date!, gran))
+  const validLoads = loads.filter(l => l.scheduled_pickup_date)
+  const groups = groupBy(validLoads, l => getPeriodKey(l.scheduled_pickup_date!, gran))
   return Object.entries(groups)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([period, ls]) => {

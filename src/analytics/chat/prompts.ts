@@ -1,7 +1,7 @@
 // Compact schema description passed to the AI so it can write SQL.
 export const DB_SCHEMA = `
 TABLE loads (one row per freight invoice):
-  invoice_num text (unique id), booked_date date,
+  invoice_num text (unique id), scheduled_pickup_date date,
 
   -- PEOPLE (individuals at FitzMark):
   sales_rep text        (FitzMark salesperson who owns the account),
@@ -13,7 +13,7 @@ TABLE loads (one row per freight invoice):
   -- COMPANIES (external):
   customer_name text    (the shipping customer / company),
 
-  booked_date date,
+  scheduled_pickup_date date,
   scheduled_pickup_date date, actual_pickup_date date,
   scheduled_delivery_date date, actual_delivery_date date,
   pickup_location_name text, pickup_city text, pickup_state text, pickup_zip text,
@@ -55,23 +55,23 @@ POSTGRES RULES:
   RIGHT: (CURRENT_DATE - some_date) -- already an integer
 - NEVER use INTERVAL for relative date ranges — use integer subtraction instead.
   This ensures your numbers match the dashboard exactly.
-  WRONG: booked_date >= CURRENT_DATE - INTERVAL '1 month'
-  RIGHT:  booked_date >= CURRENT_DATE - 30
+  WRONG: scheduled_pickup_date >= CURRENT_DATE - INTERVAL '1 month'
+  RIGHT:  scheduled_pickup_date >= CURRENT_DATE - 30
 
 DATE RANGE DEFINITIONS (must match these exactly — do not deviate):
-  "today"          → booked_date = CURRENT_DATE
-  "last week"      → booked_date >= CURRENT_DATE - 7
-  "last month"     → booked_date >= CURRENT_DATE - 30
-  "last 3 months"  → booked_date >= CURRENT_DATE - 90
-  "last 6 months"  → booked_date >= CURRENT_DATE - 180
-  "last year"      → booked_date >= CURRENT_DATE - 365
-  "this month"     → booked_date >= DATE_TRUNC('month', CURRENT_DATE)
-  "this year"      → booked_date >= DATE_TRUNC('year',  CURRENT_DATE)
+  "today"          → scheduled_pickup_date = CURRENT_DATE
+  "last week"      → scheduled_pickup_date >= CURRENT_DATE - 7
+  "last month"     → scheduled_pickup_date >= CURRENT_DATE - 30
+  "last 3 months"  → scheduled_pickup_date >= CURRENT_DATE - 90
+  "last 6 months"  → scheduled_pickup_date >= CURRENT_DATE - 180
+  "last year"      → scheduled_pickup_date >= CURRENT_DATE - 365
+  "this month"     → scheduled_pickup_date >= DATE_TRUNC('month', CURRENT_DATE)
+  "this year"      → scheduled_pickup_date >= DATE_TRUNC('year',  CURRENT_DATE)
   All ranges are inclusive of today: no upper bound needed unless specified.
 
 - NEVER use quote_orig_profit, quote_current_profit, or any quote_* column when the question is about actual profit/revenue.
 - "discount" = quote_orig_rev - load_revenue (when positive).
-- Dates are ISO (YYYY-MM-DD). Always filter on booked_date for time ranges.
+- Dates are ISO (YYYY-MM-DD). Always filter on scheduled_pickup_date for time ranges.
 `.trim()
 
 // ── Prompt builders ───────────────────────────────────────────────────────────
@@ -90,7 +90,7 @@ RULES:
 - NEVER use INSERT, UPDATE, DELETE, DROP, TRUNCATE, ALTER, CREATE, or any DDL/DML. Read-only only.
 - Reference only the tables/columns above.
 - For any revenue/profit/margin question ALWAYS use load_revenue and load_profit. NEVER use quote_orig_profit, quote_current_profit, or manually compute revenue - expenses. load_profit is the authoritative profit column.
-- Always filter on booked_date for date ranges. Use integer subtraction: booked_date >= CURRENT_DATE - 30 (not INTERVAL).
+- Always filter on scheduled_pickup_date for date ranges. Use integer subtraction: scheduled_pickup_date >= CURRENT_DATE - 30 (not INTERVAL).
 
 NAME MATCHING (critical):
 - People (sales reps, account reps, dispatchers) live in: sales_rep, account_rep, dispatch_rep, quote_creator.
