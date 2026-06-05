@@ -111,20 +111,35 @@ export default function AnalyticsApp() {
   useEffect(() => { load() }, [])
 
   const filteredLoads = useMemo(() => {
+    // Normalize filter sets for case-insensitive, whitespace-trimmed matching
+    const customerSet = filters.customers.length > 0
+      ? new Set(filters.customers.map(c => c.trim().toLowerCase())) : null
+    const repSet = filters.salesReps.length > 0
+      ? new Set(filters.salesReps.map(r => r.trim().toLowerCase())) : null
+    const branchSet = filters.branches.length > 0
+      ? new Set(filters.branches.map(b => b.trim().toLowerCase())) : null
+
     return allLoads.filter(l => {
       if (filters.dateFrom && l.scheduled_pickup_date && l.scheduled_pickup_date < filters.dateFrom) return false
       if (filters.dateTo   && l.scheduled_pickup_date && l.scheduled_pickup_date > filters.dateTo)   return false
-      if (filters.customers.length > 0 && !filters.customers.includes(l.customer_name ?? '')) return false
-      if (filters.salesReps.length > 0 && !filters.salesReps.includes(l.sales_rep ?? ''))     return false
-      if (filters.branches.length  > 0 && !filters.branches.includes(l.branch_name ?? ''))    return false
+      if (customerSet && !customerSet.has((l.customer_name ?? '').trim().toLowerCase())) return false
+      if (repSet      && !repSet.has((l.sales_rep ?? '').trim().toLowerCase()))          return false
+      if (branchSet   && !branchSet.has((l.branch_name ?? '').trim().toLowerCase()))     return false
       return true
     })
   }, [allLoads, filters])
 
-  const customers = useMemo(() =>
-    [...new Set(allLoads.map(l => l.customer_name).filter(Boolean) as string[])].sort(),
-    [allLoads]
-  )
+  const customers = useMemo(() => {
+    // Deduplicate case-insensitively, keeping the first-seen casing
+    const seen = new Map<string, string>()
+    for (const l of allLoads) {
+      const raw = l.customer_name
+      if (!raw) continue
+      const key = raw.trim().toLowerCase()
+      if (!seen.has(key)) seen.set(key, raw.trim())
+    }
+    return [...seen.values()].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
+  }, [allLoads])
 
   // Fort Worth reps sort first — detect by their most common branch containing "fort worth"
   const salesReps = useMemo(() => {
