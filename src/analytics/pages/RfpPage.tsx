@@ -10,6 +10,7 @@ import {
   type RfpBid,
 } from '../lib/customerApi'
 import { fmt } from '../lib/calculations'
+import KpiDashboard from '../components/KpiDashboard'
 import styles from './RfpPage.module.css'
 
 // ── Setup banner ──────────────────────────────────────────────────────────────
@@ -428,6 +429,30 @@ export default function RfpPage() {
       .sort((a, b) => b.totalRevenue - a.totalRevenue)
   }, [rfpCustomers, customers, allLoads, customerGroups])
 
+  // All loads belonging to any RFP customer (direct name, child, or umbrella match)
+  const rfpLoads = useMemo(() => {
+    if (rfpCustomers.length === 0) return []
+    const directNames = new Set<string>()
+    const umbrellas: ((s: string) => boolean)[] = []
+    for (const rfpC of rfpCustomers) {
+      const umbrellaGroup = customerGroups.find(g => g.label.trim().toLowerCase() === rfpC.name.trim().toLowerCase())
+      if (umbrellaGroup) {
+        umbrellas.push(umbrellaGroup.match)
+      } else {
+        directNames.add(rfpC.name.trim().toLowerCase())
+        for (const child of customers.filter(c => c.parent_id === rfpC.id)) {
+          directNames.add(child.name.trim().toLowerCase())
+        }
+      }
+    }
+    return allLoads.filter(l => {
+      if (!l.customer_name) return false
+      const norm = l.customer_name.trim().toLowerCase()
+      if (directNames.has(norm)) return true
+      return umbrellas.some(m => m(l.customer_name!))
+    })
+  }, [rfpCustomers, customers, allLoads, customerGroups])
+
   async function handleSaveBid(data: Partial<RfpBid> & { customer_id: string }) {
     setSavingBid(true)
     try {
@@ -488,6 +513,17 @@ export default function RfpPage() {
       <h1 className={styles.title}>RFP Customer Tracker</h1>
 
       {error && <SetupBanner error={error} />}
+
+      {/* ── Dashboard with week-over-week trends ───────────────────────────── */}
+      {!loading && rfpCustomers.length > 0 && (
+        <KpiDashboard
+          loads={rfpLoads}
+          title="RFP Portfolio Dashboard"
+          leadingCards={[
+            { label: 'RFP Customers', value: rfpCustomers.length, format: 'count', color: '#a78bfa' },
+          ]}
+        />
+      )}
 
       {/* ── Section 1: Pending Bids ── */}
       <section className={styles.section}>

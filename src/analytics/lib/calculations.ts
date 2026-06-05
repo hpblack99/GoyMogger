@@ -68,6 +68,7 @@ export function calcKPIs(loads: Load[]): KPIs {
   const profit = loads.reduce((s, l) => s + (l.load_profit ?? 0), 0)
   const customers = new Set(loads.map(l => l.customer_name).filter(Boolean))
   const reps = new Set(loads.map(l => l.sales_rep).filter(Boolean))
+  const carriers = new Set(loads.map(l => l.current_carrier_name).filter(Boolean))
   return {
     revenue,
     cost,
@@ -78,7 +79,20 @@ export function calcKPIs(loads: Load[]): KPIs {
     profitPerLoad: safeDiv(profit, n),
     activeCustomers: customers.size,
     activeSalesReps: reps.size,
+    activeCarriers: carriers.size,
   }
+}
+
+/**
+ * Weekly KPI snapshots (one calcKPIs per Sun–Sat business week), sorted
+ * chronologically. Used to drive week-over-week sparklines and deltas.
+ */
+export function calcWeeklyKpiSeries(loads: Load[]): { week: string; kpis: KPIs }[] {
+  const valid = loads.filter(l => l.scheduled_pickup_date)
+  const groups = groupBy(valid, l => getPeriodKey(l.scheduled_pickup_date!, 'week'))
+  return Object.entries(groups)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([week, ls]) => ({ week, kpis: calcKPIs(ls) }))
 }
 
 export function calcPeriodKPIs(loads: Load[], dateFrom: string, dateTo: string): PeriodKPIs {

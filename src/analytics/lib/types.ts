@@ -72,6 +72,7 @@ export interface KPIs {
   profitPerLoad: number
   activeCustomers: number
   activeSalesReps: number
+  activeCarriers: number
 }
 
 export interface PeriodKPIs {

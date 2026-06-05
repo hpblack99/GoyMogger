@@ -4,7 +4,7 @@ import {
   ComposedChart, Area, Line, ReferenceLine, ReferenceArea, Cell,
 } from 'recharts'
 import { useAnalytics } from '../AnalyticsApp'
-import { calcEntitySummaries, calcPeriodKPIs, safeDiv, fmt } from '../lib/calculations'
+import { calcEntitySummaries, calcWeeklyKpiSeries, safeDiv, fmt } from '../lib/calculations'
 import type { TrendGranularity } from '../lib/calculations'
 import { useMultiTrend, ENTITY_COLORS, GROSS_COLORS } from '../lib/useMultiSeries'
 import FilterBar from '../components/FilterBar'
@@ -12,6 +12,7 @@ import DataTable from '../components/DataTable'
 import type { EntitySummary } from '../lib/types'
 import type { Column } from '../components/DataTable'
 import CustomerSettingsModal from '../components/CustomerSettingsModal'
+import KpiDashboard from '../components/KpiDashboard'
 import styles from './CustomerPage.module.css'
 
 // ── KPI definitions ───────────────────────────────────────────────────────────
@@ -117,15 +118,6 @@ function fmtDelta(nominal: number, format: KpiDef['format']) {
   return `${sign}${Math.round(nominal)}${nominal < 0 ? ' ▼' : ' ▲'}`
 }
 
-function TrendPct({ pct }: { pct: number }) {
-  if (!isFinite(pct)) return <span className={styles.trendFlat}>—</span>
-  if (pct === 0)      return <span className={styles.trendFlat}>0.0%</span>
-  return (
-    <span className={pct > 0 ? styles.trendUp : styles.trendDown}>
-      {pct > 0 ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}% vs prior period
-    </span>
-  )
-}
 
 function GranToggle({ gran, onChange }: { gran: TrendGranularity; onChange: (g: TrendGranularity) => void }) {
   return (
@@ -143,7 +135,7 @@ function GranToggle({ gran, onChange }: { gran: TrendGranularity; onChange: (g: 
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function CustomerPage() {
-  const { filteredLoads, allLoads, filters, setFilters, customers, salesReps, branches, customerGroups } = useAnalytics()
+  const { filteredLoads, filters, setFilters, customers, salesReps, branches, customerGroups } = useAnalytics()
 
   // Table pagination
   const [page, setPage] = useState(0)
@@ -283,29 +275,10 @@ export default function CustomerPage() {
     [filteredLoads, customerGroups]
   )
 
-  const activeCarriers = useMemo(() =>
-    new Set(filteredLoads.map(l => l.current_carrier_name).filter(Boolean)).size,
+  // Weekly distinct-customer series for the dashboard sparkline
+  const customerWeekSeries = useMemo(
+    () => calcWeeklyKpiSeries(filteredLoads).map(w => w.kpis.activeCustomers),
     [filteredLoads]
-  )
-
-  const entityFilteredLoads = useMemo(() => {
-    const customerSet = filters.customers.length > 0
-      ? new Set(filters.customers.map(c => c.trim().toLowerCase())) : null
-    const repSet = filters.salesReps.length > 0
-      ? new Set(filters.salesReps.map(r => r.trim().toLowerCase())) : null
-    const branchSet = filters.branches.length > 0
-      ? new Set(filters.branches.map(b => b.trim().toLowerCase())) : null
-    return allLoads.filter(l => {
-      if (customerSet && !customerSet.has((l.customer_name ?? '').trim().toLowerCase())) return false
-      if (repSet      && !repSet.has((l.sales_rep ?? '').trim().toLowerCase()))          return false
-      if (branchSet   && !branchSet.has((l.branch_name ?? '').trim().toLowerCase()))     return false
-      return true
-    })
-  }, [allLoads, filters])
-
-  const period = useMemo(() =>
-    calcPeriodKPIs(entityFilteredLoads, filters.dateFrom, filters.dateTo),
-    [entityFilteredLoads, filters.dateFrom, filters.dateTo]
   )
 
   // Pagination
@@ -316,7 +289,6 @@ export default function CustomerPage() {
   const totalLoads  = summaries.reduce((s, x) => s + x.loadCount, 0)
   const totalRev    = summaries.reduce((s, x) => s + x.revenue,   0)
   const totalProfit = summaries.reduce((s, x) => s + x.profit,    0)
-  const totalCost   = summaries.reduce((s, x) => s + x.cost,      0)
   const totalMargin = totalRev > 0 ? (totalProfit / totalRev) * 100 : 0
   const footerCells = [
     'TOTAL',
@@ -416,29 +388,14 @@ export default function CustomerPage() {
         <button className={styles.expandBtn} onClick={() => setExpanded(true)}>⛶ Open Analysis</button>
       </div>
 
-      {/* ── Dashboard ──────────────────────────────────────────────────────── */}
-      <div className={styles.dashboardSection}>
-        <div className={styles.dashboardLabel}>Dashboard</div>
-        <div className={styles.kpiGrid}>
-          {([
-            { label: 'Customers',       value: fmt.num(summaries.length),          pct: null },
-            { label: 'Active Carriers', value: fmt.num(activeCarriers),            pct: null },
-            { label: 'Total Loads',     value: fmt.num(totalLoads),                pct: period.changes.loadCount },
-            { label: 'Total Revenue',   value: fmt.dollar(totalRev),               pct: period.changes.revenue },
-            { label: 'Total Expense',   value: fmt.dollar(totalCost),              pct: null },
-            { label: 'Total GP',        value: fmt.dollar(totalProfit),            pct: period.changes.profit },
-            { label: 'Avg Margin',      value: fmt.pct(totalMargin),               pct: period.changes.margin },
-            { label: 'Rev / Load',      value: fmt.dollar(totalRev    / Math.max(totalLoads, 1)), pct: null },
-            { label: 'GP / Load',       value: fmt.dollar(totalProfit / Math.max(totalLoads, 1)), pct: null },
-          ] as { label: string; value: string; pct: number | null }[]).map(card => (
-            <div key={card.label} className={styles.kpiCard}>
-              <div className={styles.kpiLabel}>{card.label}</div>
-              <div className={styles.kpiValue}>{card.value}</div>
-              {card.pct !== null ? <TrendPct pct={card.pct} /> : <div className={styles.kpiSub}>&nbsp;</div>}
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* ── Dashboard with week-over-week trends ───────────────────────────── */}
+      <KpiDashboard
+        loads={filteredLoads}
+        leadingCards={[
+          { label: 'Customers', value: summaries.length, format: 'count',
+            series: customerWeekSeries, color: '#60a5fa' },
+        ]}
+      />
 
       {/* ── Data table with pagination + grand total ──────────────────────── */}
       <DataTable
