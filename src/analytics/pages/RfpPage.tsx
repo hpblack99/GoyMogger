@@ -283,7 +283,7 @@ const statusLabel: Record<RfpBid['status'], string> = {
 // ── RfpPage ───────────────────────────────────────────────────────────────────
 
 export default function RfpPage() {
-  const { allLoads } = useAnalytics()
+  const { allLoads, customerGroups } = useAnalytics()
 
   const [customers, setCustomers] = useState<CustomerRecord[]>([])
   const [bids, setBids] = useState<RfpBid[]>([])
@@ -314,21 +314,31 @@ export default function RfpPage() {
     [customers]
   )
 
-  // Build rollup stats for each RFP customer (parent + children)
+  // Build rollup stats for each RFP customer (parent + children + umbrella group)
   const rfpStats = useMemo(() => {
     return rfpCustomers
       .map(rfpC => {
         const children = customers.filter(c => c.parent_id === rfpC.id)
         const accountNames = new Set([rfpC.name, ...children.map(c => c.name)])
-        const loads = allLoads.filter(l => l.customer_name && accountNames.has(l.customer_name))
+        // If this customer name matches an umbrella group label, use its matcher
+        const umbrellaGroup = customerGroups.find(g => g.label === rfpC.name)
+        const loads = allLoads.filter(l => {
+          if (!l.customer_name) return false
+          if (umbrellaGroup) return umbrellaGroup.match(l.customer_name)
+          return accountNames.has(l.customer_name)
+        })
         const loadCount = loads.length
         const totalRevenue = loads.reduce((s, l) => s + (l.load_revenue ?? 0), 0)
         const totalProfit = loads.reduce((s, l) => s + (l.load_profit ?? 0), 0)
         const margin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0
-        return { rfpC, children, loadCount, totalRevenue, totalProfit, margin }
+        // For umbrella groups show the matched member names as "child accounts"
+        const umbrellaMembers = umbrellaGroup
+          ? [...new Set(loads.map(l => l.customer_name).filter(Boolean))] as string[]
+          : []
+        return { rfpC, children, umbrellaMembers, loadCount, totalRevenue, totalProfit, margin }
       })
       .sort((a, b) => b.totalRevenue - a.totalRevenue)
-  }, [rfpCustomers, customers, allLoads])
+  }, [rfpCustomers, customers, allLoads, customerGroups])
 
   async function handleSaveBid(data: Partial<RfpBid> & { customer_id: string }) {
     setSavingBid(true)
@@ -449,11 +459,15 @@ export default function RfpPage() {
                 </tr>
               </thead>
               <tbody>
-                {rfpStats.map(({ rfpC, children, loadCount, totalRevenue, totalProfit, margin }) => (
+                {rfpStats.map(({ rfpC, children, umbrellaMembers, loadCount, totalRevenue, totalProfit, margin }) => (
                   <tr key={rfpC.id}>
                     <td>{rfpC.name}</td>
                     <td>
-                      {children.length > 0 ? (
+                      {umbrellaMembers.length > 0 ? (
+                        <div className={styles.childList}>
+                          {umbrellaMembers.join(', ')}
+                        </div>
+                      ) : children.length > 0 ? (
                         <div className={styles.childList}>
                           {children.map(c => c.name).join(', ')}
                         </div>
