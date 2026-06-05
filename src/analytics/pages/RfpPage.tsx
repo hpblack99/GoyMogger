@@ -221,7 +221,11 @@ export default function RfpPage() {
       setCustomers(c)
       setBids(b)
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to load data')
+      const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? 'Failed to load data'
+      const isSetup = msg.includes('relation') || msg.includes('does not exist') || msg.includes('42P01')
+      setError(isSetup
+        ? 'Database tables not yet created. Please run supabase/rfp_customer_tracker.sql in your Supabase SQL Editor, then refresh.'
+        : msg)
     } finally {
       setLoading(false)
     }
@@ -257,7 +261,7 @@ export default function RfpPage() {
       await load()
       setEditingBid(null)
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to save bid')
+      setError((e instanceof Error ? e.message : (e as { message?: string })?.message) ?? 'Failed to save bid')
     } finally {
       setSavingBid(false)
     }
@@ -271,7 +275,7 @@ export default function RfpPage() {
       await load()
       setEditingBid(null)
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to delete bid')
+      setError((e instanceof Error ? e.message : (e as { message?: string })?.message) ?? 'Failed to delete bid')
     } finally {
       setSavingBid(false)
     }
