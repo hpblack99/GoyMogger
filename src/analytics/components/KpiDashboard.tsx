@@ -50,7 +50,7 @@ function formatVal(v: number, format: MetricFormat): string {
 }
 
 /** Week-over-week change chip: latest complete week vs the prior week. */
-function WoWChip({ series }: { series: number[] }) {
+function WoWChip({ series, tooltip }: { series: number[]; tooltip?: string }) {
   if (!series || series.length < 2) {
     return <div className={styles.wowFlat}>—</div>
   }
@@ -58,25 +58,25 @@ function WoWChip({ series }: { series: number[] }) {
   const prev = series[series.length - 2]
   const pct = pctChange(last, prev)
   if (!isFinite(pct) || pct === 0) {
-    return <div className={styles.wowFlat}>0.0% WoW</div>
+    return <div className={styles.wowFlat} title={tooltip}>0.0% WoW</div>
   }
   const up = pct > 0
   return (
-    <div className={up ? styles.wowUp : styles.wowDown}>
+    <div className={up ? styles.wowUp : styles.wowDown} title={tooltip}>
       {up ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}% WoW
     </div>
   )
 }
 
-function Card({ label, value, format, sparkSeries, wowSeries, color }: {
+function Card({ label, value, format, sparkSeries, wowSeries, color, wowTooltip }: {
   label: string; value: number; format: MetricFormat
-  sparkSeries: number[]; wowSeries: number[]; color: string
+  sparkSeries: number[]; wowSeries: number[]; color: string; wowTooltip?: string
 }) {
   return (
     <div className={styles.card}>
       <div className={styles.cardLabel}>{label}</div>
       <div className={styles.cardValue}>{formatVal(value, format)}</div>
-      <WoWChip series={wowSeries} />
+      <WoWChip series={wowSeries} tooltip={wowTooltip} />
       <div className={styles.spark}>
         <Sparkline data={sparkSeries} color={color} />
       </div>
@@ -104,9 +104,33 @@ export default function KpiDashboard({ loads, title = 'Dashboard', leadingCards 
   // the week-over-week comparison so deltas reflect complete weeks only.
   const completeCount = useMemo(() => completeWeekCount(weekly.map(w => w.week)), [weekly])
 
+  // Human-readable ranges of the two weeks the WoW deltas compare.
+  const wowCaption = useMemo(() => {
+    if (completeCount < 2) return null
+    const latest = weekly[completeCount - 1].week
+    const prior  = weekly[completeCount - 2].week
+    return { latest: fmt.weekRangeLabel(latest), prior: fmt.weekRangeLabel(prior) }
+  }, [weekly, completeCount])
+
+  const wowTooltip = wowCaption
+    ? `Week over week: ${wowCaption.latest} vs ${wowCaption.prior}`
+    : undefined
+
   return (
     <div className={styles.section}>
-      <div className={styles.sectionLabel}>{title}</div>
+      <div className={styles.sectionHead}>
+        <div className={styles.sectionLabel}>{title}</div>
+        {wowCaption ? (
+          <div className={styles.wowCaption}>
+            <span className={styles.wowCaptionTag}>Week over week</span>
+            <span className={styles.wowCaptionRange}>{wowCaption.latest}</span>
+            <span className={styles.wowCaptionVs}>vs</span>
+            <span className={styles.wowCaptionRangePrior}>{wowCaption.prior}</span>
+          </div>
+        ) : (
+          <div className={styles.wowCaptionMuted}>Not enough complete weeks for a WoW comparison</div>
+        )}
+      </div>
       <div className={styles.grid}>
         {leadingCards.map(c => {
           const spark = c.series ?? []
@@ -115,7 +139,7 @@ export default function KpiDashboard({ loads, title = 'Dashboard', leadingCards 
           const wow = spark.length === weekly.length ? spark.slice(0, completeCount) : spark
           return (
             <Card key={c.label} label={c.label} value={c.value} format={c.format}
-              sparkSeries={spark} wowSeries={wow} color={c.color ?? '#8b949e'} />
+              sparkSeries={spark} wowSeries={wow} color={c.color ?? '#8b949e'} wowTooltip={wowTooltip} />
           )
         })}
         {metrics.map(key => {
@@ -123,7 +147,7 @@ export default function KpiDashboard({ loads, title = 'Dashboard', leadingCards 
           const spark = weekly.map(w => w.kpis[key])
           return (
             <Card key={key} label={meta.label} value={totals[key]} format={meta.format}
-              sparkSeries={spark} wowSeries={spark.slice(0, completeCount)} color={meta.color} />
+              sparkSeries={spark} wowSeries={spark.slice(0, completeCount)} color={meta.color} wowTooltip={wowTooltip} />
           )
         })}
       </div>

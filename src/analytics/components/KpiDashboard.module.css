@@ -4,11 +4,56 @@
   gap: 8px;
 }
 
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .sectionLabel {
   font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
+  color: var(--color-neutral-500);
+}
+
+.wowCaption {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.74rem;
+}
+
+.wowCaptionTag {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-neutral-500);
+  background: var(--color-neutral-200);
+  border-radius: 4px;
+  padding: 2px 7px;
+}
+
+.wowCaptionRange {
+  font-weight: 700;
+  color: var(--color-neutral-800);
+}
+
+.wowCaptionVs {
+  color: var(--color-neutral-500);
+}
+
+.wowCaptionRangePrior {
+  font-weight: 600;
+  color: var(--color-neutral-600);
+}
+
+.wowCaptionMuted {
+  font-size: 0.72rem;
   color: var(--color-neutral-500);
 }
 
