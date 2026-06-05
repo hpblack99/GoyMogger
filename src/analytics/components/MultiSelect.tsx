@@ -16,17 +16,47 @@ interface Props {
 }
 
 export default function MultiSelect({ label, options, value, onChange, allLabel = 'All', groups = [] }: Props) {
-  const [open, setOpen]     = useState(false)
-  const [search, setSearch] = useState('')
-  const ref = useRef<HTMLDivElement>(null)
+  const [open, setOpen]           = useState(false)
+  const [search, setSearch]       = useState('')
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  const [dropHeight, setDropHeight] = useState(280)
+  const wrapRef      = useRef<HTMLDivElement>(null)
+  const dropRef      = useRef<HTMLDivElement>(null)
+  const resizingRef  = useRef(false)
+  const resizeStartY = useRef(0)
+  const resizeStartH = useRef(0)
 
+  // Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
+
+  // Resize drag handlers
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!resizingRef.current) return
+      const delta = e.clientY - resizeStartY.current
+      setDropHeight(Math.max(160, Math.min(600, resizeStartH.current + delta)))
+    }
+    const onUp = () => { resizingRef.current = false }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+  }, [])
+
+  const startResize = (e: React.MouseEvent) => {
+    e.preventDefault()
+    resizingRef.current = true
+    resizeStartY.current = e.clientY
+    resizeStartH.current = dropHeight
+  }
 
   const norm = (s: string) => s.toLowerCase()
   const filtered = options.filter(o => norm(o).includes(norm(search)))
@@ -35,47 +65,29 @@ export default function MultiSelect({ label, options, value, onChange, allLabel 
     onChange(value.includes(opt) ? value.filter(v => v !== opt) : [...value, opt])
   }, [value, onChange])
 
-  const clear      = useCallback(() => { onChange([]);             setSearch('') }, [onChange])
-  const selectAll  = useCallback(() => { onChange([...options]);   setSearch('') }, [options, onChange])
+  const clear     = useCallback(() => { onChange([]);           setSearch('') }, [onChange])
+  const selectAll = useCallback(() => { onChange([...options]); setSearch('') }, [options, onChange])
 
-  // Group helpers
-  const groupMembers = (g: OptionGroup) => options.filter(o => g.match(o))
+  const groupMembers       = (g: OptionGroup) => options.filter(o => g.match(o))
   const groupSelectedCount = (g: OptionGroup) => groupMembers(g).filter(o => value.includes(o)).length
-  const toggleGroup = (g: OptionGroup) => {
-    const members = groupMembers(g)
+
+  const toggleGroupSelect = (g: OptionGroup, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const members   = groupMembers(g)
     const allSelected = members.every(o => value.includes(o))
-    if (allSelected) {
-      onChange(value.filter(o => !members.includes(o)))
-    } else {
-      const toAdd = members.filter(o => !value.includes(o))
-      onChange([...value, ...toAdd])
-    }
+    if (allSelected) onChange(value.filter(o => !members.includes(o)))
+    else onChange([...value, ...members.filter(o => !value.includes(o))])
   }
 
-  // Which options belong to a group (for rendering — ungrouped options shown separately)
+  const toggleGroupExpand = (label: string) => {
+    setExpandedGroups(prev => {
+      const n = new Set(prev)
+      n.has(label) ? n.delete(label) : n.add(label)
+      return n
+    })
+  }
+
   const groupedOptions = new Set(groups.flatMap(g => options.filter(o => g.match(o))))
-
-  // Build the render list: interleave group headers + members, then ungrouped
-  type RenderItem =
-    | { kind: 'group'; group: OptionGroup }
-    | { kind: 'member'; opt: string; group: OptionGroup }
-    | { kind: 'option'; opt: string }
-
-  const renderItems: RenderItem[] = []
-
-  for (const g of groups) {
-    const members = filtered.filter(o => g.match(o))
-    if (members.length === 0) continue
-    renderItems.push({ kind: 'group', group: g })
-    for (const opt of members) {
-      renderItems.push({ kind: 'member', opt, group: g })
-    }
-  }
-  for (const opt of filtered) {
-    if (!groupedOptions.has(opt)) {
-      renderItems.push({ kind: 'option', opt })
-    }
-  }
 
   const summary = value.length === 0
     ? allLabel
@@ -84,7 +96,7 @@ export default function MultiSelect({ label, options, value, onChange, allLabel 
       : `${value.length} selected`
 
   return (
-    <div className={styles.wrap} ref={ref}>
+    <div className={styles.wrap} ref={wrapRef}>
       <span className={styles.fieldLabel}>{label}</span>
       <button
         className={`${styles.trigger} ${open ? styles.triggerOpen : ''} ${value.length > 0 ? styles.triggerActive : ''}`}
@@ -96,7 +108,7 @@ export default function MultiSelect({ label, options, value, onChange, allLabel 
       </button>
 
       {open && (
-        <div className={styles.dropdown}>
+        <div className={styles.dropdown} ref={dropRef} style={{ height: dropHeight }}>
           <div className={styles.searchWrap}>
             <input
               className={styles.search}
@@ -110,46 +122,75 @@ export default function MultiSelect({ label, options, value, onChange, allLabel 
             <button type="button" className={styles.action} onClick={selectAll}>All</button>
             <button type="button" className={styles.action} onClick={clear}>Clear</button>
           </div>
+
           <ul className={styles.list}>
-            {renderItems.length === 0 && (
-              <li className={styles.empty}>No matches</li>
-            )}
-            {renderItems.map((item, i) => {
-              if (item.kind === 'group') {
-                const total    = groupMembers(item.group).length
-                const selected = groupSelectedCount(item.group)
-                const allSel   = selected === total
-                const someSel  = selected > 0 && !allSel
-                return (
-                  <li key={`g-${i}`} className={`${styles.item} ${styles.groupHeader}`} onClick={() => toggleGroup(item.group)}>
-                    <span className={`${styles.checkbox} ${allSel ? styles.checked : someSel ? styles.indeterminate : ''}`}>
+            {/* Umbrella groups */}
+            {groups.map(g => {
+              const members  = filtered.filter(o => g.match(o))
+              if (members.length === 0) return null
+              const total    = groupMembers(g).length
+              const selected = groupSelectedCount(g)
+              const allSel   = selected === total
+              const someSel  = selected > 0 && !allSel
+              const expanded = expandedGroups.has(g.label)
+
+              return (
+                <li key={g.label}>
+                  {/* Group header row */}
+                  <div
+                    className={styles.groupHeader}
+                    onClick={() => toggleGroupExpand(g.label)}
+                  >
+                    <span
+                      className={`${styles.checkbox} ${allSel ? styles.checked : someSel ? styles.indeterminate : ''}`}
+                      onClick={e => toggleGroupSelect(g, e)}
+                      title="Select all"
+                    >
                       {allSel ? '✓' : someSel ? '–' : ''}
                     </span>
-                    <span className={styles.groupLabel}>{item.group.label}</span>
+                    <span className={styles.groupLabel}>{g.label}</span>
                     <span className={styles.groupCount}>{selected}/{total}</span>
-                  </li>
-                )
-              }
-              if (item.kind === 'member') {
-                return (
-                  <li key={item.opt} className={`${styles.item} ${styles.memberItem}`} onClick={() => toggle(item.opt)}>
-                    <span className={`${styles.checkbox} ${value.includes(item.opt) ? styles.checked : ''}`}>
-                      {value.includes(item.opt) ? '✓' : ''}
-                    </span>
-                    <span className={styles.optLabel}>{item.opt}</span>
-                  </li>
-                )
-              }
-              return (
-                <li key={item.opt} className={styles.item} onClick={() => toggle(item.opt)}>
-                  <span className={`${styles.checkbox} ${value.includes(item.opt) ? styles.checked : ''}`}>
-                    {value.includes(item.opt) ? '✓' : ''}
-                  </span>
-                  <span className={styles.optLabel}>{item.opt}</span>
+                    <span className={styles.groupChevron}>{expanded ? '▾' : '▸'}</span>
+                  </div>
+
+                  {/* Collapsible member list */}
+                  {expanded && (
+                    <ul className={styles.memberList}>
+                      {members.map(opt => (
+                        <li
+                          key={opt}
+                          className={`${styles.item} ${styles.memberItem}`}
+                          onClick={() => toggle(opt)}
+                        >
+                          <span className={`${styles.checkbox} ${value.includes(opt) ? styles.checked : ''}`}>
+                            {value.includes(opt) ? '✓' : ''}
+                          </span>
+                          <span className={styles.optLabel}>{opt}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </li>
               )
             })}
+
+            {/* Ungrouped options */}
+            {filtered.filter(o => !groupedOptions.has(o)).map(opt => (
+              <li key={opt} className={styles.item} onClick={() => toggle(opt)}>
+                <span className={`${styles.checkbox} ${value.includes(opt) ? styles.checked : ''}`}>
+                  {value.includes(opt) ? '✓' : ''}
+                </span>
+                <span className={styles.optLabel}>{opt}</span>
+              </li>
+            ))}
+
+            {filtered.length === 0 && (
+              <li className={styles.empty}>No matches</li>
+            )}
           </ul>
+
+          {/* Resize handle */}
+          <div className={styles.resizeHandle} onMouseDown={startResize} title="Drag to resize" />
         </div>
       )}
     </div>
