@@ -319,13 +319,13 @@ export default function RfpPage() {
     return rfpCustomers
       .map(rfpC => {
         const children = customers.filter(c => c.parent_id === rfpC.id)
-        const accountNames = new Set([rfpC.name, ...children.map(c => c.name)])
+        const accountNames = new Set([rfpC.name, ...children.map(c => c.name)].map(n => n.trim().toLowerCase()))
         // If this customer name matches an umbrella group label, use its matcher
-        const umbrellaGroup = customerGroups.find(g => g.label === rfpC.name)
+        const umbrellaGroup = customerGroups.find(g => g.label.trim().toLowerCase() === rfpC.name.trim().toLowerCase())
         const loads = allLoads.filter(l => {
           if (!l.customer_name) return false
           if (umbrellaGroup) return umbrellaGroup.match(l.customer_name)
-          return accountNames.has(l.customer_name)
+          return accountNames.has(l.customer_name.trim().toLowerCase())
         })
         const loadCount = loads.length
         const totalRevenue = loads.reduce((s, l) => s + (l.load_revenue ?? 0), 0)

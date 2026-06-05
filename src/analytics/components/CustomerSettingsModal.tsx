@@ -43,7 +43,7 @@ export default function CustomerSettingsModal({ customerName, onClose }: Props) 
         if (cancelled) return
         setGroups(grps)
         setAllCustomers(customers)
-        const found = customers.find(c => c.name === customerName) ?? null
+        const found = customers.find(c => c.name.trim().toLowerCase() === customerName.trim().toLowerCase()) ?? null
         setCustomer(found)
         if (found) {
           setIsRfp(found.is_rfp_customer)
