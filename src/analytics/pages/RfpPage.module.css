@@ -1,3 +1,76 @@
+/* ── Setup / error banners ── */
+.errorBanner {
+  padding: 14px 18px;
+  background: rgba(248,113,113,0.1);
+  border: 1px solid #f87171;
+  border-radius: 8px;
+  color: #f87171;
+  font-size: 0.85rem;
+}
+
+.setupBanner {
+  background: var(--color-neutral-100);
+  border: 1px solid #f59e0b;
+  border-radius: 10px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.setupTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fbbf24;
+}
+
+.setupText {
+  font-size: 0.85rem;
+  color: var(--color-neutral-600);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.setupText strong { color: var(--color-neutral-700); }
+
+.sqlBlock {
+  position: relative;
+  background: var(--color-neutral-50);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.sqlPre {
+  margin: 0;
+  padding: 14px 16px;
+  padding-right: 80px;
+  font-family: 'Fira Mono', 'Consolas', monospace;
+  font-size: 0.72rem;
+  color: var(--color-neutral-600);
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.6;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.copyBtn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #22c55e;
+  border: none;
+  border-radius: 6px;
+  color: #0d1117;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.copyBtn:hover { background: #4ade80; }
+
 .page {
   padding: 24px;
   display: flex;

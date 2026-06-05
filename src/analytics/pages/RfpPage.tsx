@@ -11,6 +11,85 @@ import {
 import { fmt } from '../lib/calculations'
 import styles from './RfpPage.module.css'
 
+// ── Setup banner ──────────────────────────────────────────────────────────────
+
+const MIGRATION_SQL = `-- Run in Supabase Dashboard → SQL Editor
+CREATE TABLE IF NOT EXISTS customer_groups (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL UNIQUE,
+  created_at timestamptz DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS customers (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL UNIQUE,
+  is_rfp_customer boolean NOT NULL DEFAULT false,
+  parent_id uuid REFERENCES customers(id) ON DELETE SET NULL,
+  group_id uuid REFERENCES customer_groups(id) ON DELETE SET NULL,
+  notes text,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+INSERT INTO customers (name)
+SELECT DISTINCT customer_name FROM loads
+WHERE customer_name IS NOT NULL AND customer_name <> ''
+ON CONFLICT (name) DO NOTHING;
+CREATE TABLE IF NOT EXISTS rfp_bids (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  description text, lanes int,
+  estimated_revenue numeric, estimated_profit numeric,
+  status text NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending','won','lost','declined')),
+  bid_date date, decision_date date, notes text,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+ALTER TABLE customer_groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rfp_bids ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "auth_all" ON customer_groups FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "auth_all" ON customers FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "auth_all" ON rfp_bids FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE OR REPLACE FUNCTION sync_customers_from_loads()
+RETURNS void LANGUAGE sql SECURITY DEFINER AS $$
+  INSERT INTO customers (name)
+  SELECT DISTINCT customer_name FROM loads
+  WHERE customer_name IS NOT NULL AND customer_name <> ''
+  ON CONFLICT (name) DO NOTHING;
+$$;`
+
+const NEEDS_SETUP_KEYWORDS = ['schema cache', 'does not exist', 'relation', '42P01', 'undefined', 'not found']
+
+function SetupBanner({ error }: { error: string }) {
+  const [copied, setCopied] = useState(false)
+  const isSetup = NEEDS_SETUP_KEYWORDS.some(k => error.toLowerCase().includes(k.toLowerCase()))
+
+  const copy = () => {
+    navigator.clipboard.writeText(MIGRATION_SQL).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  if (!isSetup) return <div className={styles.errorBanner}>{error}</div>
+
+  return (
+    <div className={styles.setupBanner}>
+      <div className={styles.setupTitle}>⚠ One-time database setup required</div>
+      <p className={styles.setupText}>
+        The RFP Tracker tables don't exist yet. Copy the SQL below and run it in your{' '}
+        <strong>Supabase Dashboard → SQL Editor</strong>, then refresh this page.
+      </p>
+      <div className={styles.sqlBlock}>
+        <pre className={styles.sqlPre}>{MIGRATION_SQL}</pre>
+        <button className={styles.copyBtn} onClick={copy}>
+          {copied ? '✓ Copied!' : 'Copy SQL'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── BidModal ─────────────────────────────────────────────────────────────────
 
 interface BidModalProps {
@@ -221,11 +300,8 @@ export default function RfpPage() {
       setCustomers(c)
       setBids(b)
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? 'Failed to load data'
-      const isSetup = msg.includes('relation') || msg.includes('does not exist') || msg.includes('42P01')
-      setError(isSetup
-        ? 'Database tables not yet created. Please run supabase/rfp_customer_tracker.sql in your Supabase SQL Editor, then refresh.'
-        : msg)
+      const msg = (e instanceof Error ? e.message : (e as { message?: string })?.message) ?? 'Failed to load data'
+      setError(msg)
     } finally {
       setLoading(false)
     }
@@ -285,7 +361,7 @@ export default function RfpPage() {
     <div className={styles.page}>
       <h1 className={styles.title}>RFP Customer Tracker</h1>
 
-      {error && <div className={styles.empty} style={{ color: '#f87171' }}>{error}</div>}
+      {error && <SetupBanner error={error} />}
 
       {/* ── Section 1: Pending Bids ── */}
       <section className={styles.section}>
