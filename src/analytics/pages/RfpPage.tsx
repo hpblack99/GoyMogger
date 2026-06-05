@@ -3,6 +3,7 @@ import { useAnalytics } from '../AnalyticsApp'
 import {
   fetchCustomers,
   fetchRfpBids,
+  upsertCustomer,
   upsertRfpBid,
   deleteRfpBid,
   type CustomerRecord,
@@ -85,6 +86,92 @@ function SetupBanner({ error }: { error: string }) {
         <button className={styles.copyBtn} onClick={copy}>
           {copied ? '✓ Copied!' : 'Copy SQL'}
         </button>
+      </div>
+    </div>
+  )
+}
+
+// ── AddRfpCustomerModal ───────────────────────────────────────────────────────
+
+interface AddRfpCustomerModalProps {
+  allCustomerNames: string[]
+  rfpCustomerNames: Set<string>
+  onAdd: (name: string) => Promise<void>
+  onClose: () => void
+}
+
+function AddRfpCustomerModal({ allCustomerNames, rfpCustomerNames, onAdd, onClose }: AddRfpCustomerModalProps) {
+  const [search, setSearch] = useState('')
+  const [selected, setSelected] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return allCustomerNames
+      .filter(n => !rfpCustomerNames.has(n.trim().toLowerCase()))
+      .filter(n => !q || n.toLowerCase().includes(q))
+  }, [allCustomerNames, rfpCustomerNames, search])
+
+  async function handleAdd() {
+    if (!selected) return
+    setSaving(true)
+    setError(null)
+    try {
+      await onAdd(selected)
+      onClose()
+    } catch (e: unknown) {
+      setError((e instanceof Error ? e.message : (e as { message?: string })?.message) ?? 'Failed to add customer')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className={styles.overlay} onClick={onClose}>
+      <div className={styles.modal} onClick={e => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
+          <span className={styles.modalTitle}>Add RFP Customer</span>
+        </div>
+        <div className={styles.form}>
+          <div className={styles.formRow}>
+            <label className={styles.formLabel}>Search Customer</label>
+            <input
+              className={styles.formInput}
+              type="text"
+              placeholder="Type to search…"
+              value={search}
+              onChange={e => { setSearch(e.target.value); setSelected(null) }}
+              autoFocus
+            />
+          </div>
+          <div className={styles.formRow}>
+            <div className={styles.customerPickList}>
+              {filtered.length === 0 ? (
+                <div className={styles.pickEmpty}>No customers found</div>
+              ) : filtered.map(name => (
+                <div
+                  key={name}
+                  className={`${styles.pickItem} ${selected === name ? styles.pickItemSelected : ''}`}
+                  onClick={() => setSelected(name)}
+                >
+                  {name}
+                </div>
+              ))}
+            </div>
+          </div>
+          {selected && (
+            <div className={styles.formRow}>
+              <span className={styles.formLabel}>Selected: <strong style={{ color: 'var(--color-neutral-800)' }}>{selected}</strong></span>
+            </div>
+          )}
+          {error && <div className={styles.formRow} style={{ color: '#f87171', fontSize: '0.82rem' }}>{error}</div>}
+        </div>
+        <div className={styles.formActions}>
+          <button className={styles.cancelBtn} onClick={onClose} disabled={saving}>Cancel</button>
+          <button className={styles.saveBtn} onClick={handleAdd} disabled={saving || !selected}>
+            {saving ? 'Adding…' : 'Add to RFP Tracker'}
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -290,6 +377,7 @@ export default function RfpPage() {
   const [loading, setLoading] = useState(true)
   const [editingBid, setEditingBid] = useState<Partial<RfpBid> | null>(null)
   const [savingBid, setSavingBid] = useState(false)
+  const [addingRfpCustomer, setAddingRfpCustomer] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function load() {
@@ -351,6 +439,34 @@ export default function RfpPage() {
     } finally {
       setSavingBid(false)
     }
+  }
+
+  // All unique customer names from loads (deduplicated case-insensitively)
+  const allCustomerNames = useMemo(() => {
+    const seen = new Map<string, string>()
+    for (const l of allLoads) {
+      const raw = l.customer_name
+      if (!raw) continue
+      const key = raw.trim().toLowerCase()
+      if (!seen.has(key)) seen.set(key, raw.trim())
+    }
+    return [...seen.values()].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
+  }, [allLoads])
+
+  const rfpCustomerNameSet = useMemo(
+    () => new Set(rfpCustomers.map(c => c.name.trim().toLowerCase())),
+    [rfpCustomers]
+  )
+
+  async function handleAddRfpCustomer(name: string) {
+    // Find existing DB record (case-insensitive) or create a new one
+    const existing = customers.find(c => c.name.trim().toLowerCase() === name.trim().toLowerCase())
+    await upsertCustomer({
+      ...(existing ? { id: existing.id } : {}),
+      name: existing ? existing.name : name,
+      is_rfp_customer: true,
+    })
+    await load()
   }
 
   async function handleDeleteBid(id: string) {
@@ -437,6 +553,9 @@ export default function RfpPage() {
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
           <span className={styles.sectionTitle}>RFP Account Performance (All Time)</span>
+          <button className={styles.addBtn} onClick={() => setAddingRfpCustomer(true)}>
+            + Add RFP Customer
+          </button>
         </div>
 
         {loading ? (
@@ -486,6 +605,16 @@ export default function RfpPage() {
           </div>
         )}
       </section>
+
+      {/* ── Add RFP Customer Modal ── */}
+      {addingRfpCustomer && (
+        <AddRfpCustomerModal
+          allCustomerNames={allCustomerNames}
+          rfpCustomerNames={rfpCustomerNameSet}
+          onAdd={handleAddRfpCustomer}
+          onClose={() => setAddingRfpCustomer(false)}
+        />
+      )}
 
       {/* ── Bid Modal ── */}
       {editingBid !== null && (
