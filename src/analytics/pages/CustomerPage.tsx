@@ -36,11 +36,7 @@ const KPI_DASH: Record<KpiId, string | undefined> = {
   revenue: undefined, profit: '6 3', margin: '2 4', loadCount: undefined,
 }
 
-const PASTEL = [
-  '#a8d8ea','#aa96da','#fcbad3','#b5ead7','#ffdac1',
-  '#c7ceea','#e2f0cb','#f8b4c8','#b5d5c5','#d4a5a5',
-  '#9ab8d8','#c8d5b9','#f6c6a2','#d5b8e0','#bee3db',
-]
+const PAGE_SIZE = 15
 
 const COLS: Column<EntitySummary>[] = [
   { key: 'name',           header: 'Customer' },
@@ -54,19 +50,12 @@ const COLS: Column<EntitySummary>[] = [
 
 // ── Recharts helpers ──────────────────────────────────────────────────────────
 
-function AngledTick({ x = 0, y = 0, payload }: { x?: number; y?: number; payload?: { value: string } }) {
-  return (
-    <g transform={`translate(${x},${y})`}>
-      <text x={0} y={0} dy={6} textAnchor="end" fill="#c9d1d9" fontSize={10}
-        transform="rotate(-38)">{payload?.value}</text>
-    </g>
-  )
-}
 
 const axisTick = { fontSize: 10, fill: '#6e7681' }
 const gridProps = { strokeDasharray: '3 3' as const, stroke: '#21262d' }
-const ttStyle   = { background: '#161b22', border: '1px solid #30363d', borderRadius: 8, fontSize: 12 }
+const ttStyle   = { background: '#161b22', border: '1px solid #30363d', borderRadius: 8, fontSize: 12, color: '#c9d1d9' }
 const ttLabel   = { color: '#c9d1d9', fontWeight: 600 }
+const ttItem    = { color: '#c9d1d9' }
 
 function fmtVal(v: number, format: KpiDef['format']) {
   if (format === 'dollar') return `$${v.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
@@ -109,6 +98,9 @@ function GranToggle({ gran, onChange }: { gran: TrendGranularity; onChange: (g: 
 export default function CustomerPage() {
   const { filteredLoads, allLoads, filters } = useAnalytics()
 
+  // Table pagination
+  const [page, setPage] = useState(0)
+
   // Modal / expand state
   const [expanded, setExpanded]     = useState(false)
   const [expandMode, setExpandMode] = useState<'gross'|'trend'>('gross')
@@ -146,7 +138,11 @@ export default function CustomerPage() {
 
   const top15 = summaries.slice(0, 15)
 
-  // Grand total footer
+  // Pagination
+  const totalPages  = Math.ceil(summaries.length / PAGE_SIZE)
+  const pageRows    = summaries.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+
+  // Grand total footer (all rows, always visible)
   const totalLoads = summaries.reduce((s, x) => s + x.loadCount, 0)
   const totalRev   = summaries.reduce((s, x) => s + x.revenue,   0)
   const totalProfit = summaries.reduce((s, x) => s + x.profit,   0)
@@ -308,7 +304,7 @@ export default function CustomerPage() {
          : grossMetric === 'profit'  ? s.profit
          : grossMetric === 'margin'  ? s.margin
          : s.loadCount,
-    color: PASTEL[i % PASTEL.length],
+    color: ENTITY_COLORS[i % ENTITY_COLORS.length],
   }))
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -347,18 +343,29 @@ export default function CustomerPage() {
               tickFormatter={(v: number) => `$${(v/1000).toFixed(0)}k`} />
             <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: '#c9d1d9' }}
               tickLine={false} axisLine={false} width={145} />
-            <Tooltip contentStyle={ttStyle} labelStyle={ttLabel}
-              formatter={(v: number) => fmt.dollar(v)} />
-            <Bar dataKey="revenue" fill="#22c55e" radius={[0,4,4,0]} />
+            <Tooltip contentStyle={ttStyle} labelStyle={ttLabel} itemStyle={ttItem}
+              formatter={(v: number) => [fmt.dollar(v), 'Revenue']} />
+            <Bar dataKey="revenue" radius={[0,4,4,0]}>
+              {top15.map((_, i) => (
+                <Cell key={i} fill={ENTITY_COLORS[i % ENTITY_COLORS.length]} fillOpacity={0.85} />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
 
-      {/* ── Data table with grand total ────────────────────────────────────── */}
+      {/* ── Data table with pagination + grand total ──────────────────────── */}
       <DataTable
-        columns={COLS} rows={summaries} rowKey={r => r.name}
+        columns={COLS} rows={pageRows} rowKey={r => r.name}
         emptyMessage="No customer data" footerCells={footerCells}
       />
+      {totalPages > 1 && (
+        <div className={styles.pagination}>
+          <button className={styles.pageBtn} disabled={page === 0} onClick={() => setPage(p => p - 1)}>← Prev</button>
+          <span className={styles.pageInfo}>Page {page + 1} of {totalPages} ({summaries.length} customers)</span>
+          <button className={styles.pageBtn} disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>Next →</button>
+        </div>
+      )}
 
       {/* ── Expanded modal ─────────────────────────────────────────────────── */}
       {expanded && (
@@ -459,7 +466,7 @@ export default function CustomerPage() {
                       width={44} hide={!hasRight} />
                     <YAxis yAxisId="count" orientation="right" hide />
                     {!deltaMode && (
-                      <Tooltip contentStyle={ttStyle} labelStyle={ttLabel} labelFormatter={labelFmt}
+                      <Tooltip contentStyle={ttStyle} labelStyle={ttLabel} itemStyle={ttItem} labelFormatter={labelFmt}
                         formatter={(v: unknown, _n: unknown, props: { dataKey?: string|number }) =>
                           fmtVal(v as number, keyFormat[String(props.dataKey ?? '')] ?? 'count')} />
                     )}
@@ -471,24 +478,26 @@ export default function CustomerPage() {
                 </ResponsiveContainer>
               ) : (
                 <ResponsiveContainer width="100%" height={480}>
-                  <BarChart data={grossChartData}
-                    margin={{ top: 8, right: 16, left: 8, bottom: 90 }}>
-                    <CartesianGrid {...gridProps} />
-                    <XAxis dataKey="name"
-                      tick={<AngledTick />}
-                      tickLine={false} interval={0} />
-                    <YAxis tick={axisTick} tickLine={false} axisLine={false}
+                  <BarChart data={grossChartData} layout="vertical"
+                    margin={{ top: 4, right: 16, left: 160, bottom: 0 }}>
+                    <CartesianGrid {...gridProps} horizontal={false} />
+                    <XAxis type="number" tick={axisTick} tickLine={false} axisLine={false}
                       tickFormatter={(v: number) =>
                         grossMetric === 'margin'    ? `${v.toFixed(0)}%`
                         : grossMetric === 'loadCount' ? String(Math.round(v))
-                        : `$${(v/1000).toFixed(0)}k`}
-                      width={52} />
-                    <Tooltip contentStyle={ttStyle} labelStyle={ttLabel}
-                      formatter={(v: number) =>
+                        : `$${(v/1000).toFixed(0)}k`} />
+                    <YAxis type="category" dataKey="name"
+                      tick={{ fontSize: 11, fill: '#c9d1d9' }}
+                      tickLine={false} axisLine={false} width={155} />
+                    <Tooltip contentStyle={ttStyle} labelStyle={ttLabel} itemStyle={ttItem}
+                      formatter={(v: number) => [
                         grossMetric === 'margin'    ? `${v.toFixed(1)}%`
                         : grossMetric === 'loadCount' ? fmt.num(v)
-                        : fmt.dollar(v)} />
-                    <Bar dataKey="value" radius={[4,4,0,0]} maxBarSize={60}>
+                        : fmt.dollar(v),
+                        grossMetric === 'loadCount' ? 'Loads'
+                        : grossMetric.charAt(0).toUpperCase() + grossMetric.slice(1),
+                      ]} />
+                    <Bar dataKey="value" radius={[0,4,4,0]} maxBarSize={28}>
                       {grossChartData.map((entry, i) => (
                         <Cell key={i} fill={entry.color} fillOpacity={0.88} />
                       ))}

@@ -90,6 +90,34 @@
   color: var(--color-neutral-700);
 }
 
+/* ── Table pagination ── */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.pageBtn {
+  background: var(--color-neutral-100);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: 6px;
+  color: var(--color-neutral-600);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 5px 14px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.pageBtn:hover:not(:disabled) { background: var(--color-neutral-200); color: var(--color-neutral-900); }
+.pageBtn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.pageInfo {
+  font-size: 0.78rem;
+  color: var(--color-neutral-500);
+}
+
 /* ── Full-screen overlay ── */
 .overlay {
   position: fixed;

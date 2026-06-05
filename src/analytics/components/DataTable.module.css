@@ -28,7 +28,9 @@
 }
 
 .table tbody tr:last-child { border-bottom: none; }
-.table tbody tr:hover { background: var(--color-neutral-100); }
+.table tbody tr:nth-child(even) { background: var(--color-neutral-100); }
+.table tbody tr:nth-child(odd)  { background: var(--color-neutral-50); }
+.table tbody tr:hover { background: var(--color-neutral-200) !important; }
 
 .table tbody td {
   padding: 10px 16px;
