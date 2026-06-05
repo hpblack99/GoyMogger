@@ -4,7 +4,7 @@ import {
   ComposedChart, Area, Line, ReferenceLine, ReferenceArea, Cell,
 } from 'recharts'
 import { useAnalytics } from '../AnalyticsApp'
-import { calcEntitySummaries, calcPeriodKPIs, fmt } from '../lib/calculations'
+import { calcEntitySummaries, calcPeriodKPIs, safeDiv, fmt } from '../lib/calculations'
 import type { TrendGranularity } from '../lib/calculations'
 import { useMultiTrend, ENTITY_COLORS, GROSS_COLORS } from '../lib/useMultiSeries'
 import FilterBar from '../components/FilterBar'
@@ -38,7 +38,41 @@ const KPI_DASH: Record<KpiId, string | undefined> = {
   revenue: undefined, profit: '6 3', margin: '2 4', loadCount: undefined,
 }
 
+import type { OptionGroup } from '../components/MultiSelect'
+
 const PAGE_SIZE = 15
+
+// Merge individual customer summaries into umbrella groups where applicable
+function consolidateSummaries(summaries: EntitySummary[], groups: OptionGroup[]): EntitySummary[] {
+  const grouped = new Map<string, EntitySummary>()   // groupLabel → merged
+  const standalone: EntitySummary[] = []
+
+  for (const s of summaries) {
+    const g = groups.find(g => g.match(s.name))
+    if (g) {
+      const existing = grouped.get(g.label)
+      if (!existing) {
+        grouped.set(g.label, { ...s, name: g.label })
+      } else {
+        const revenue   = existing.revenue   + s.revenue
+        const profit    = existing.profit    + s.profit
+        const cost      = existing.cost      + s.cost
+        const loadCount = existing.loadCount + s.loadCount
+        grouped.set(g.label, {
+          name: g.label,
+          revenue, profit, cost, loadCount,
+          margin:         safeDiv(profit, revenue) * 100,
+          revenuePerLoad: safeDiv(revenue, loadCount),
+          profitPerLoad:  safeDiv(profit,  loadCount),
+        })
+      }
+    } else {
+      standalone.push(s)
+    }
+  }
+
+  return [...standalone, ...grouped.values()].sort((a, b) => b.revenue - a.revenue)
+}
 const TOP_N_OPTIONS = [5, 10, 15, 20] as const
 
 const COLS: Column<EntitySummary>[] = [
@@ -232,7 +266,10 @@ export default function CustomerPage() {
 
   // ── Customer summary data ─────────────────────────────────────────────────
 
-  const summaries = useMemo(() => calcEntitySummaries(filteredLoads, 'customer_name'), [filteredLoads])
+  const summaries = useMemo(
+    () => consolidateSummaries(calcEntitySummaries(filteredLoads, 'customer_name'), customerGroups),
+    [filteredLoads, customerGroups]
+  )
 
   const activeCarriers = useMemo(() =>
     new Set(filteredLoads.map(l => l.current_carrier_name).filter(Boolean)).size,
