@@ -60,6 +60,18 @@ export async function fetchRfpBids(): Promise<RfpBid[]> {
 export async function upsertCustomer(
   data: Partial<CustomerRecord> & { name: string }
 ): Promise<CustomerRecord> {
+  if (data.id) {
+    // Update existing record by primary key — avoids name-conflict resolution issues
+    const { id, ...fields } = data
+    const { data: row, error } = await supabase
+      .from('customers')
+      .update(fields)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return row as CustomerRecord
+  }
   const { data: row, error } = await supabase
     .from('customers')
     .upsert(data, { onConflict: 'name' })
