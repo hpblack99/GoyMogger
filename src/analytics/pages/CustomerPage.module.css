@@ -8,7 +8,7 @@
 .title {
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--color-neutral-50);
+  color: var(--color-neutral-900);
   margin: 0;
 }
 
@@ -20,8 +20,8 @@
 }
 
 .kpiCard {
-  background: var(--color-neutral-800);
-  border: 1px solid var(--color-neutral-700);
+  background: var(--color-neutral-100);
+  border: 1px solid var(--color-neutral-200);
   border-radius: 10px;
   padding: 14px 16px;
   display: flex;
@@ -34,13 +34,13 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--color-neutral-400);
+  color: var(--color-neutral-500);
 }
 
 .kpiValue {
   font-size: 1.35rem;
   font-weight: 700;
-  color: var(--color-neutral-50);
+  color: var(--color-neutral-900);
   line-height: 1.2;
 }
 
@@ -56,8 +56,8 @@
 
 /* ── Chart card ── */
 .chartCard {
-  background: var(--color-neutral-800);
-  border: 1px solid var(--color-neutral-700);
+  background: var(--color-neutral-100);
+  border: 1px solid var(--color-neutral-200);
   border-radius: 10px;
   padding: 16px;
 }
@@ -72,22 +72,22 @@
 .chartTitle {
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--color-neutral-200);
+  color: var(--color-neutral-700);
 }
 
 .expandBtn {
-  background: transparent;
-  border: 1px solid var(--color-neutral-600);
+  background: none;
+  border: 1px solid var(--color-neutral-300);
   border-radius: 6px;
-  color: var(--color-neutral-400);
+  color: var(--color-neutral-500);
   font-size: 0.75rem;
   padding: 4px 10px;
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s;
 }
 .expandBtn:hover {
-  border-color: var(--color-neutral-400);
-  color: var(--color-neutral-200);
+  border-color: var(--color-neutral-500);
+  color: var(--color-neutral-700);
 }
 
 /* ── Full-screen overlay ── */
@@ -103,8 +103,8 @@
 }
 
 .modal {
-  background: var(--color-neutral-900);
-  border: 1px solid var(--color-neutral-700);
+  background: var(--color-neutral-100);
+  border: 1px solid var(--color-neutral-200);
   border-radius: 12px;
   width: 100%;
   max-width: 1400px;
@@ -125,7 +125,7 @@
 .modalTitle {
   font-size: 1rem;
   font-weight: 700;
-  color: var(--color-neutral-50);
+  color: var(--color-neutral-900);
   flex: 1;
 }
 
@@ -139,7 +139,7 @@
 /* ── Mode toggle (Gross / Trend) ── */
 .modeToggle {
   display: flex;
-  border: 1px solid var(--color-neutral-700);
+  border: 1px solid var(--color-neutral-300);
   border-radius: 7px;
   overflow: hidden;
 }
@@ -147,23 +147,23 @@
 .modeBtn {
   background: transparent;
   border: none;
-  color: var(--color-neutral-400);
+  color: var(--color-neutral-500);
   font-size: 0.78rem;
   font-weight: 600;
   padding: 5px 12px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
-.modeBtn:hover { background: var(--color-neutral-700); color: var(--color-neutral-200); }
+.modeBtn:hover { background: var(--color-neutral-200); color: var(--color-neutral-700); }
 .modeBtnOn {
-  background: var(--color-neutral-700);
-  color: var(--color-neutral-50);
+  background: var(--color-neutral-200);
+  color: var(--color-neutral-900);
 }
 
 /* ── Granularity toggle ── */
 .granToggle {
   display: flex;
-  border: 1px solid var(--color-neutral-700);
+  border: 1px solid var(--color-neutral-300);
   border-radius: 7px;
   overflow: hidden;
 }
@@ -171,17 +171,17 @@
 .granBtn {
   background: transparent;
   border: none;
-  color: var(--color-neutral-400);
+  color: var(--color-neutral-500);
   font-size: 0.75rem;
   font-weight: 600;
   padding: 4px 10px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
-.granBtn:hover { background: var(--color-neutral-700); color: var(--color-neutral-200); }
+.granBtn:hover { background: var(--color-neutral-200); color: var(--color-neutral-700); }
 .granActive {
-  background: var(--color-neutral-700);
-  color: var(--color-neutral-50);
+  background: var(--color-neutral-200);
+  color: var(--color-neutral-900);
 }
 
 /* ── Delta compare button ── */
@@ -204,8 +204,8 @@
 
 .closeBtn {
   background: transparent;
-  border: 1px solid var(--color-neutral-700);
-  color: var(--color-neutral-400);
+  border: 1px solid var(--color-neutral-300);
+  color: var(--color-neutral-500);
   font-size: 0.85rem;
   width: 28px;
   height: 28px;
@@ -215,7 +215,7 @@
   align-items: center;
   justify-content: center;
 }
-.closeBtn:hover { background: var(--color-neutral-700); color: var(--color-neutral-200); }
+.closeBtn:hover { background: var(--color-neutral-200); color: var(--color-neutral-700); }
 
 /* ── KPI / entity pill controls ── */
 .controls {
@@ -252,16 +252,16 @@
   align-items: center;
   gap: 5px;
   background: transparent;
-  border: 1px solid var(--color-neutral-700);
+  border: 1px solid var(--color-neutral-300);
   border-radius: 20px;
-  color: var(--color-neutral-400);
+  color: var(--color-neutral-500);
   font-size: 0.72rem;
   font-weight: 500;
   padding: 3px 10px 3px 8px;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
-.pill:hover { background: var(--color-neutral-800); color: var(--color-neutral-200); }
+.pill:hover { background: var(--color-neutral-200); color: var(--color-neutral-700); }
 .pillOn { border-color: currentColor; }
 
 .dot {
@@ -285,8 +285,8 @@
   position: absolute;
   top: 8px;
   right: 8px;
-  background: rgba(22,27,34,0.95);
-  border: 1px solid var(--color-neutral-700);
+  background: rgba(13,17,23,0.95);
+  border: 1px solid var(--color-neutral-300);
   border-radius: 10px;
   padding: 10px 14px;
   min-width: 210px;
@@ -297,7 +297,7 @@
 .deltaHeader {
   font-size: 0.72rem;
   font-weight: 600;
-  color: var(--color-neutral-300);
+  color: var(--color-neutral-600);
   margin-bottom: 8px;
   display: flex;
   align-items: center;
@@ -305,7 +305,7 @@
 }
 
 .deltaArrow {
-  color: var(--color-neutral-500);
+  color: var(--color-neutral-400);
   margin: 0 2px;
 }
 
@@ -331,7 +331,7 @@
 }
 
 .deltaKpiLabel {
-  color: var(--color-neutral-400);
+  color: var(--color-neutral-500);
 }
 
 .deltaChange {
