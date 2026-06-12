@@ -27,6 +27,22 @@ DOWNLOAD_DIR.mkdir(exist_ok=True)
 RESULT_TIMEOUT       = 600   # max seconds to wait for FreshX processing
 RESULT_POLL_INTERVAL = 12    # seconds between poll attempts
 
+# Visible browser by default; set HEADLESS=true in .env to hide it.
+HEADLESS = os.environ.get("HEADLESS", "").lower() == "true"
+
+USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/120.0.0.0 Safari/537.36"
+)
+
+# Default header row for the bulk-upload CSV. Override in freshx-config.json →
+# upload_csv → columns if FreshX changes its template.
+DEFAULT_UPLOAD_COLUMNS = [
+    "external_id", "from_zip", "to_zip", "pallets",
+    "gross_weight", "temperature", "commodity", "is_stackable",
+]
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
@@ -66,8 +82,9 @@ def _find_col(headers: list[str], candidates: list[str]) -> str | None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 class FreshXQuoter:
-    def __init__(self, debug: bool = False):
+    def __init__(self, debug: bool = False, headless: bool | None = None):
         self.debug = debug
+        self.headless = HEADLESS if headless is None else headless
         self._playwright = None
         self._browser: Browser | None = None
         self._context: BrowserContext | None = None
@@ -76,28 +93,24 @@ class FreshXQuoter:
     def __enter__(self):
         self._playwright = sync_playwright().start()
         self._browser = self._playwright.chromium.launch(
-            headless=False,
+            headless=self.headless,
             slow_mo=300 if self.debug else 100,
             args=["--start-maximized"],
         )
         self._context = self._browser.new_context(
             no_viewport=True,   # let --start-maximized control the window size
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            ),
+            user_agent=USER_AGENT,
             accept_downloads=True,
         )
         self._page = self._context.new_page()
         return self
 
     def __exit__(self, *_):
-        for obj in (self._browser, self._playwright):
-            try:
-                obj and obj.close() if hasattr(obj, "close") else obj and obj.stop()
-            except Exception:
-                pass
+        try:
+            if self._browser:
+                self._browser.close()
+        except Exception:
+            pass
         try:
             if self._playwright:
                 self._playwright.stop()
@@ -164,10 +177,8 @@ class FreshXQuoter:
             mode="w", suffix=".csv", delete=False, newline="", encoding="utf-8"
         )
         writer = csv.writer(tf)
-        writer.writerow([
-            "external_id", "from_zip", "to_zip", "pallets",
-            "gross_weight", "temperature", "commodity", "is_stackable",
-        ])
+        columns = CONFIG.get("upload_csv", {}).get("columns") or DEFAULT_UPLOAD_COLUMNS
+        writer.writerow(columns)
         for row in rows:
             pallets = row.get("pallets") or 1
             try:
@@ -278,19 +289,26 @@ class FreshXQuoter:
                 _screenshot(self.page, "05-file-input-error")
                 raise RuntimeError(f"FreshX: could not set file on input: {e}")
 
-        # After file is set, look for a confirm/submit button (dialog or page)
-        for sel in [
+        # After the file is set, click exactly ONE confirm/submit button.
+        # Some FreshX layouts auto-submit on file select; others need a click.
+        # We stop at the first visible match so we never fire two submissions.
+        confirm_selectors = [
             "[role='dialog'] button:has-text('Upload')",
             "[role='dialog'] button[type='submit']",
             "button:has-text('Submit')",
             "button:has-text('Start Search')",
             "button:has-text('Run')",
-        ]:
+        ]
+        clicked = False
+        for sel in confirm_selectors:
+            if clicked:
+                break
             try:
-                btns = self.page.locator(sel).all()
-                for btn in btns:
+                for btn in self.page.locator(sel).all():
                     if btn.is_visible():
+                        print(f"[FreshX] Confirming upload via: {sel}")
                         btn.click()
+                        clicked = True
                         break
             except Exception:
                 continue

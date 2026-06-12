@@ -448,7 +448,7 @@ export default function QuoterPage() {
   return (
     <div className={styles.page}>
       <div className={styles.header}>
-        <h1 className={styles.title}>FFE + FreshX Reefer LTL Quote Bot</h1>
+        <h1 className={styles.title}>ReeferByHank — New Bid</h1>
         <p className={styles.subtitle}>
           Upload a spreadsheet → both carriers quote each lane → winning rate lands in Supabase.
         </p>

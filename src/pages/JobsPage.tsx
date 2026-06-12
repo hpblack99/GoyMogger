@@ -125,7 +125,7 @@ export default function JobsPage() {
           <h1 className={styles.pageTitle}>All Quotes</h1>
           <p className={styles.pageSubtitle}>Manage and monitor all FFE quoting bids.</p>
         </div>
-        <Link to="/quoter" className={styles.btnPrimary}>+ New Bid</Link>
+        <Link to="/reefer/quoter" className={styles.btnPrimary}>+ New Bid</Link>
       </div>
 
       {/* Filter tabs */}
@@ -150,7 +150,7 @@ export default function JobsPage() {
       ) : filtered.length === 0 ? (
         <div className={styles.emptyState}>
           <p className={styles.emptyText}>No {filter === 'all' ? '' : filter + ' '}bids found.</p>
-          {filter === 'all' && <Link to="/quoter" className={styles.btnPrimary}>Submit your first bid →</Link>}
+          {filter === 'all' && <Link to="/reefer/quoter" className={styles.btnPrimary}>Submit your first bid →</Link>}
         </div>
       ) : (
         <div className={styles.tableCard}>
@@ -177,7 +177,7 @@ export default function JobsPage() {
                 return (
                   <tr key={j.id} className={isDeleting ? styles.rowFading : ''}>
                     <td>
-                      <Link to={`/jobs/${j.id}`} className={styles.jobLink}>
+                      <Link to={`/reefer/jobs/${j.id}`} className={styles.jobLink}>
                         {j.name || j.id.slice(0, 8).toUpperCase()}
                       </Link>
                       {j.error && (
@@ -202,7 +202,7 @@ export default function JobsPage() {
                     <td className={styles.totalCell}>{j.total_rows}</td>
                     <td>
                       <div className={styles.actions}>
-                        <Link to={`/jobs/${j.id}`} className={styles.btnAction}>View</Link>
+                        <Link to={`/reefer/jobs/${j.id}`} className={styles.btnAction}>View</Link>
 
                         {canRequeue && (
                           <button

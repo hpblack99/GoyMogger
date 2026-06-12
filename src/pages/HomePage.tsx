@@ -67,12 +67,12 @@ export default function HomePage() {
     <div className={styles.page}>
       <div className={styles.hero}>
         <div>
-          <h1 className={styles.title}>FFE Quote Bot</h1>
+          <h1 className={styles.title}>ReeferByHank</h1>
           <p className={styles.subtitle}>
-            Upload shipment spreadsheets, get reefer LTL rates from Frozen Food Express automatically.
+            Upload shipment spreadsheets, get reefer LTL rates from FFE and FreshX automatically.
           </p>
         </div>
-        <Link to="/quoter" className={styles.ctaBtn}>+ New Quote</Link>
+        <Link to="/reefer/quoter" className={styles.ctaBtn}>+ New Quote</Link>
       </div>
 
       {/* Stats */}
@@ -87,7 +87,7 @@ export default function HomePage() {
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
           <h2 className={styles.sectionTitle}>Recent Bids</h2>
-          <Link to="/jobs" className={styles.viewAll}>Manage all bids →</Link>
+          <Link to="/reefer/jobs" className={styles.viewAll}>Manage all bids →</Link>
         </div>
 
         {loading ? (
@@ -95,7 +95,7 @@ export default function HomePage() {
         ) : jobs.length === 0 ? (
           <div className={styles.emptyState}>
             <p className={styles.emptyText}>No bids submitted yet.</p>
-            <Link to="/quoter" className={styles.ctaBtn}>Submit your first bid →</Link>
+            <Link to="/reefer/quoter" className={styles.ctaBtn}>Submit your first bid →</Link>
           </div>
         ) : (
           <div className={styles.tableCard}>
@@ -126,7 +126,7 @@ export default function HomePage() {
                         </div>
                       </td>
                       <td>
-                        <Link to={`/jobs/${j.id}`} className={styles.viewLink}>View →</Link>
+                        <Link to={`/reefer/jobs/${j.id}`} className={styles.viewLink}>View →</Link>
                       </td>
                     </tr>
                   )

@@ -5,6 +5,7 @@ Set DEBUG=true in .env to run with a visible browser. Screenshots saved to pytho
 """
 
 import json
+import os
 import re
 import time
 from datetime import datetime
@@ -20,6 +21,16 @@ CLASS_ID_MAP: dict[str, str] = CONFIG["class_id_map"]
 
 # Seconds between quotes — be polite to the server
 DELAY_BETWEEN_QUOTES = 1.5
+
+# The browser is visible by default (the operator likes to watch it work).
+# Set HEADLESS=true in .env to run without a window (e.g. on a server).
+HEADLESS = os.environ.get("HEADLESS", "").lower() == "true"
+
+USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/120.0.0.0 Safari/537.36"
+)
 
 
 def _screenshot(page: Page, name: str) -> None:
@@ -70,6 +81,22 @@ def _get_text(page: Page, selector: str) -> str | None:
     return None
 
 
+def _collect_validation_errors(page: Page) -> str | None:
+    """Scrape visible ASP.NET/jQuery validation messages so a failed submit
+    explains *why* (bad ZIP, weight below minimum, etc.) instead of a generic
+    'page never navigated' error."""
+    msgs: list[str] = []
+    for sel in (".field-validation-error", ".validation-summary-errors", ".alert-danger"):
+        try:
+            for el in page.query_selector_all(sel):
+                txt = (el.text_content() or "").strip()
+                if txt and txt not in msgs:
+                    msgs.append(txt)
+        except Exception:
+            continue
+    return "; ".join(msgs) if msgs else None
+
+
 def _find_row_value(page: Page, row_label: str, cell_index: int = -1) -> str | None:
     """Find a table row by label text and return value from specified cell (default: last cell)."""
     try:
@@ -88,8 +115,9 @@ def _find_row_value(page: Page, row_label: str, cell_index: int = -1) -> str | N
 
 
 class FFEQuoter:
-    def __init__(self, debug: bool = False):
+    def __init__(self, debug: bool = False, headless: bool | None = None):
         self.debug = debug
+        self.headless = HEADLESS if headless is None else headless
         self._playwright = None
         self._browser: Browser | None = None
         self._context: BrowserContext | None = None
@@ -98,21 +126,21 @@ class FFEQuoter:
         self._password: str | None = None
         self._job_accessorials: list[str] = []
 
-    def __enter__(self):
+    def _launch(self) -> None:
+        """Start Playwright and open a fresh browser/context/page."""
         self._playwright = sync_playwright().start()
         self._browser = self._playwright.chromium.launch(
-            headless=False,   # set to `not self.debug` once working
+            headless=self.headless,
             slow_mo=300 if self.debug else 0,
         )
         self._context = self._browser.new_context(
             viewport={"width": 1280, "height": 900},
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            ),
+            user_agent=USER_AGENT,
         )
         self._page = self._context.new_page()
+
+    def __enter__(self):
+        self._launch()
         return self
 
     def __exit__(self, *_):
@@ -169,20 +197,7 @@ class FFEQuoter:
             except Exception:
                 pass
 
-        self._playwright = sync_playwright().start()
-        self._browser = self._playwright.chromium.launch(
-            headless=False,   # set to `not self.debug` once working
-            slow_mo=300 if self.debug else 0,
-        )
-        self._context = self._browser.new_context(
-            viewport={"width": 1280, "height": 900},
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            ),
-        )
-        self._page = self._context.new_page()
+        self._launch()
 
         if not self._username:
             raise RuntimeError("Browser closed and no credentials stored for re-login.")
@@ -302,8 +317,10 @@ class FFEQuoter:
                     print(f"  [FFE] Click failed but already on result page — continuing")
                     break
                 if click_num == MAX_CLICKS:
+                    hint = _collect_validation_errors(self.page)
                     raise RuntimeError(
                         f"Submit button not clickable after {MAX_CLICKS} attempts."
+                        + (f" Form validation: {hint}" if hint else "")
                     )
                 self.page.wait_for_timeout(1_500)
                 continue
@@ -319,9 +336,11 @@ class FFEQuoter:
                     print(f"  [FFE] Load timed out but already on result page — continuing")
                     break
                 if click_num == MAX_CLICKS:
+                    hint = _collect_validation_errors(self.page)
                     raise RuntimeError(
                         f"Rate Shipment button clicked {MAX_CLICKS} times "
                         "but page never navigated to result."
+                        + (f" Form validation: {hint}" if hint else "")
                     )
                 self.page.wait_for_timeout(1_500)  # brief pause before next click
 

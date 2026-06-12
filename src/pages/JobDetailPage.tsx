@@ -206,7 +206,7 @@ export default function JobDetailPage() {
     if (!job) return
     setDeleting(true)
     await supabase.from('quote_jobs').delete().eq('id', job.id)
-    navigate('/jobs')
+    navigate('/reefer/jobs')
   }
 
   const handleRequeue = async () => {
@@ -258,7 +258,7 @@ export default function JobDetailPage() {
   if (notFound) return (
     <div className={styles.centered}>
       <p className={styles.notFoundText}>Bid not found.</p>
-      <Link to="/jobs" className={styles.btnSecondary}>← Back to Bids</Link>
+      <Link to="/reefer/jobs" className={styles.btnSecondary}>← Back to Bids</Link>
     </div>
   )
 
@@ -281,7 +281,7 @@ export default function JobDetailPage() {
   return (
     <div className={styles.page}>
       <div className={styles.breadcrumb}>
-        <Link to="/jobs" className={styles.breadcrumbLink}>Bids</Link>
+        <Link to="/reefer/jobs" className={styles.breadcrumbLink}>Bids</Link>
         <span className={styles.breadcrumbSep}>/</span>
         <span className={styles.breadcrumbCurrent}>{job_.id.slice(0, 8).toUpperCase()}</span>
       </div>
