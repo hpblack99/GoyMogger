@@ -17,8 +17,6 @@
     "download_button":"button[aria-haspopup='menu'], button:has-text('Download'), a:has-text('Download')",
     "csv_option":     "[role='menuitem']:has-text('CSV'), [role='menuitem']:has-text('Export'), li:has-text('CSV'), button:has-text('CSV'), a:has-text('CSV'), [data-value='csv'], [role='menuitem']"
   },
-  "_history_note": "Selectors for one row in the search-history list, tried in order until one matches. FreshX may be a <table>, an ARIA grid, or a div list.",
-  "history_row_selectors": ["table tbody tr", "[role='row']", "[role='rowgroup'] > div", "ul li"],
   "upload_csv": {
     "_comment": "Header row written to the bulk-upload CSV. Edit if FreshX changes its template.",
     "columns": ["external_id", "from_zip", "to_zip", "pallets", "gross_weight", "temperature", "commodity", "is_stackable"]
