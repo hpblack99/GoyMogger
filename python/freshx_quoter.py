@@ -24,10 +24,11 @@ DOWNLOAD_DIR   = Path(__file__).parent / "downloads"
 SCREENSHOT_DIR.mkdir(exist_ok=True)
 DOWNLOAD_DIR.mkdir(exist_ok=True)
 
-RESULT_TIMEOUT       = 600   # max seconds to wait for FreshX processing
+RESULT_TIMEOUT       = 600   # base max seconds to wait for FreshX processing
 RESULT_POLL_INTERVAL = 12    # seconds between poll attempts
+PER_LANE_SECONDS     = 25    # extra wait budget per lane (big batches take longer)
 
-# Visible browser by default; set HEADLESS=true in .env to hide it.
+# Visible browser by default (the operator likes to watch it); HEADLESS=true hides it.
 HEADLESS = os.environ.get("HEADLESS", "").lower() == "true"
 
 USER_AGENT = (
@@ -36,11 +37,21 @@ USER_AGENT = (
     "Chrome/120.0.0.0 Safari/537.36"
 )
 
-# Default header row for the bulk-upload CSV. Override in freshx-config.json →
+# Header row written to the bulk-upload CSV. Override in freshx-config.json →
 # upload_csv → columns if FreshX changes its template.
 DEFAULT_UPLOAD_COLUMNS = [
     "external_id", "from_zip", "to_zip", "pallets",
     "gross_weight", "temperature", "commodity", "is_stackable",
+]
+
+# Selectors for a single row in the search-history list. FreshX is a modern SPA
+# and may render the list as a real <table> OR a div/grid — we try each. Override
+# in freshx-config.json → history_row_selectors.
+DEFAULT_HISTORY_ROW_SELECTORS = [
+    "table tbody tr",
+    "[role='row']",
+    "[role='rowgroup'] > div",
+    "ul li",
 ]
 
 
@@ -152,8 +163,11 @@ class FreshXQuoter:
 
         _screenshot(self.page, "02-credentials-filled")
         self.page.click(cfg["submit"])
+        # FreshX is a chatty SPA (live websockets/polling) so it NEVER reaches
+        # network-idle — waiting for that state just times out and kills the run.
+        # Wait for the DOM + a short settle so the post-login redirect resolves.
         self.page.wait_for_load_state("load", timeout=30_000)
-        self.page.wait_for_timeout(1_500)
+        self.page.wait_for_timeout(2_500)
         _screenshot(self.page, "03-after-login")
 
         url = self.page.url.lower()
@@ -216,8 +230,8 @@ class FreshXQuoter:
         self.login(email, password)
 
         print("[FreshX] Navigating to bulk search page…")
-        self.page.goto(CONFIG["urls"]["bulk_search"], wait_until="load", timeout=30_000)
-        self.page.wait_for_timeout(1_000)
+        self.page.goto(CONFIG["urls"]["bulk_search"], wait_until="domcontentloaded", timeout=30_000)
+        self.page.wait_for_timeout(2_500)   # SPA render settle (never network-idle)
         self.page.evaluate("window.scrollTo(0, 0)")
         _screenshot(self.page, "04-bulk-search-page")
 
@@ -229,11 +243,16 @@ class FreshXQuoter:
 
         self._upload_file(csv_path)
 
-        print(f"[FreshX] Waiting for results (up to {RESULT_TIMEOUT}s)…")
-        result_row = self._wait_for_result(pre_count, len(rows))
+        # Larger batches take FreshX longer to process — scale the deadline.
+        timeout = max(RESULT_TIMEOUT, len(rows) * PER_LANE_SECONDS)
+        print(f"[FreshX] Waiting for results (up to {timeout}s for {len(rows)} lanes)…")
+        result_row = self._wait_for_result(pre_count, len(rows), timeout)
         if result_row is None:
+            _screenshot(self.page, "08-result-timeout")
             raise RuntimeError(
-                f"FreshX: timed out after {RESULT_TIMEOUT}s waiting for bulk quote results."
+                f"FreshX: timed out after {timeout}s waiting for bulk quote results. "
+                "See python/screenshots/freshx-08-result-timeout*.png and freshx-09-poll-*.png "
+                "to check whether the search-history row/selector changed."
             )
 
         print("[FreshX] Results ready — downloading CSV…")
@@ -291,7 +310,7 @@ class FreshXQuoter:
 
         # After the file is set, click exactly ONE confirm/submit button.
         # Some FreshX layouts auto-submit on file select; others need a click.
-        # We stop at the first visible match so we never fire two submissions.
+        # Stop at the first visible match so we never fire two submissions.
         confirm_selectors = [
             "[role='dialog'] button:has-text('Upload')",
             "[role='dialog'] button[type='submit']",
@@ -313,51 +332,84 @@ class FreshXQuoter:
             except Exception:
                 continue
 
-        self.page.wait_for_load_state("load", timeout=20_000)
-        self.page.wait_for_timeout(1_000)
+        self.page.wait_for_timeout(2_000)   # let the search enqueue (no network-idle wait)
         _screenshot(self.page, "07-after-upload-submit")
 
     # ─── Wait for result row ──────────────────────────────────────────────────
 
-    def _count_history_rows(self) -> int:
-        try:
-            return len(self.page.locator("table tbody tr").all())
-        except Exception:
-            return 0
+    def _history_rows(self):
+        """Return (row_locators, selector_used). FreshX may render the search
+        history as a <table>, an ARIA grid, or a div/list — try each until one
+        yields rows so a UI refactor doesn't silently break result detection."""
+        selectors = CONFIG.get("history_row_selectors") or DEFAULT_HISTORY_ROW_SELECTORS
+        for sel in selectors:
+            try:
+                rows = self.page.locator(sel).all()
+                if rows:
+                    return rows, sel
+            except Exception:
+                continue
+        return [], None
 
-    def _wait_for_result(self, pre_count: int, expected_lanes: int) -> object | None:
-        deadline = time.time() + RESULT_TIMEOUT
+    def _count_history_rows(self) -> int:
+        rows, _ = self._history_rows()
+        return len(rows)
+
+    def _row_is_ready(self, row) -> bool:
+        """A finished search exposes a Download/Export affordance."""
+        try:
+            dl = row.locator(
+                "button[aria-haspopup='menu'], "
+                "button:has-text('Download'), a:has-text('Download'), "
+                "button:has-text('Export'), a:has-text('Export')"
+            ).first
+            return dl.is_visible()
+        except Exception:
+            return False
+
+    def _wait_for_result(self, pre_count: int, expected_lanes: int,
+                         timeout: int = RESULT_TIMEOUT) -> object | None:
+        deadline = time.time() + timeout
         attempt  = 0
 
         while time.time() < deadline:
             attempt += 1
             try:
-                rows = self.page.locator("table tbody tr").all()
-                # Only look at rows that appeared after the upload; if none yet, keep waiting.
+                rows, sel = self._history_rows()
+                # Rows that appeared after our upload (list is newest-first).
                 new_rows = rows[:max(0, len(rows) - pre_count)]
-                if not new_rows:
-                    print(f"[FreshX]   New row not yet in history ({len(rows)} rows currently)…")
+
+                if not rows:
+                    print(f"[FreshX]   No history rows visible yet "
+                          f"(tried selectors, none matched) — attempt {attempt}")
+                elif not new_rows:
+                    print(f"[FreshX]   Our search not in history yet "
+                          f"({len(rows)} rows via '{sel}')…")
                 else:
+                    # The newest post-upload row is our search. Prefer a row whose
+                    # text mentions our lane count, but fall back to the newest new
+                    # row so a formatting change in the count doesn't strand us.
+                    target = None
                     for row in new_rows:
-                        text = row.inner_text()
-                        has_download = False
                         try:
-                            dl = row.locator(
-                                "button[aria-haspopup='menu'], "
-                                "button:has-text('Download'), a:has-text('Download')"
-                            ).first
-                            has_download = dl.is_visible()
+                            text = row.inner_text()
                         except Exception:
-                            pass
+                            text = ""
+                        if str(expected_lanes) in text and self._row_is_ready(row):
+                            target = row
+                            break
+                    if target is None:
+                        newest = new_rows[0]
+                        if self._row_is_ready(newest):
+                            target = newest
 
-                        lanes_match = str(expected_lanes) in text
-                        if lanes_match and has_download:
-                            print(f"[FreshX] Results ready (attempt {attempt}). Row: {text[:80]}")
-                            _screenshot(self.page, "09-results-ready")
-                            return row
+                    if target is not None:
+                        print(f"[FreshX] Results ready (attempt {attempt}, via '{sel}').")
+                        _screenshot(self.page, "09-results-ready")
+                        return target
 
-                        if lanes_match:
-                            print(f"[FreshX]   Row found but not ready yet: {text[:60]}")
+                    print(f"[FreshX]   {len(new_rows)} new row(s) found but none "
+                          f"downloadable yet…")
 
             except Exception as e:
                 print(f"[FreshX]   Poll error (attempt {attempt}): {e}")
@@ -367,8 +419,8 @@ class FreshXQuoter:
             time.sleep(RESULT_POLL_INTERVAL)
 
             try:
-                self.page.reload(wait_until="load", timeout=20_000)
-                self.page.wait_for_timeout(1_000)
+                self.page.reload(wait_until="domcontentloaded", timeout=20_000)
+                self.page.wait_for_timeout(1_500)
                 self.page.evaluate("window.scrollTo(0, 0)")
                 _screenshot(self.page, f"09-poll-{attempt}")
             except Exception:
@@ -381,20 +433,36 @@ class FreshXQuoter:
     def _download_results_csv(self, result_row, num_rows: int) -> dict[int, dict]:
         out_path = str(DOWNLOAD_DIR / f"freshx_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
 
-        dl_locator = result_row.locator("button[aria-haspopup='menu']").first
-
-        # Scroll to top so the dropdown menu opens within the viewport, not
-        # clipped by the bottom edge or obscured by a partially-scrolled page.
+        # Scroll into view so the menu opens within the viewport.
+        try:
+            result_row.scroll_into_view_if_needed(timeout=3_000)
+        except Exception:
+            pass
         self.page.evaluate("window.scrollTo(0, 0)")
         self.page.wait_for_timeout(300)
 
-        # The Download button always opens a dropdown (never a direct download).
-        # Use force=True as fallback to bypass any backdrop overlay left from a
-        # previous menu open/close cycle.
+        # Locate the download/export trigger — a Reka dropdown, or a plain
+        # Download/Export button/link if the UI changed.
+        dl_locator = result_row.locator(
+            "button[aria-haspopup='menu'], "
+            "button:has-text('Download'), a:has-text('Download'), "
+            "button:has-text('Export'), a:has-text('Export')"
+        ).first
+
+        # Some triggers download directly; others open a dropdown. Try to catch a
+        # direct download first; if none fires, fall through to menu-item clicking.
+        opened_menu = True
         try:
-            dl_locator.click(timeout=10_000)
+            with self.page.expect_download(timeout=4_000) as dl_info:
+                try:
+                    dl_locator.click(timeout=10_000)
+                except Exception:
+                    dl_locator.click(force=True)
+            dl_info.value.save_as(out_path)
+            print(f"[FreshX] Direct download: {out_path}")
+            return _parse_results_csv(out_path, num_rows)
         except Exception:
-            dl_locator.click(force=True)
+            opened_menu = True  # no direct download → a dropdown likely opened
 
         self.page.wait_for_timeout(800)
         _screenshot(self.page, "10-download-dropdown")
@@ -409,28 +477,29 @@ class FreshXQuoter:
             "[role='menuitem']",  # last resort: first visible menu item
         ]
 
-        for sel in csv_selectors:
-            try:
-                els = self.page.locator(sel).all()
-                for el in els:
-                    try:
-                        if el.is_visible(timeout=800):
-                            label = el.inner_text().strip()
-                            print(f"[FreshX] Clicking menu item: '{label}'")
-                            with self.page.expect_download(timeout=30_000) as dl_info:
-                                el.click()
-                            dl_info.value.save_as(out_path)
-                            print(f"[FreshX] Downloaded: {out_path}")
-                            return _parse_results_csv(out_path, num_rows)
-                    except Exception:
-                        continue
-            except Exception:
-                continue
+        if opened_menu:
+            for sel in csv_selectors:
+                try:
+                    els = self.page.locator(sel).all()
+                    for el in els:
+                        try:
+                            if el.is_visible(timeout=800):
+                                label = el.inner_text().strip()
+                                print(f"[FreshX] Clicking menu item: '{label}'")
+                                with self.page.expect_download(timeout=30_000) as dl_info:
+                                    el.click()
+                                dl_info.value.save_as(out_path)
+                                print(f"[FreshX] Downloaded: {out_path}")
+                                return _parse_results_csv(out_path, num_rows)
+                        except Exception:
+                            continue
+                except Exception:
+                    continue
 
         _screenshot(self.page, "10-download-failed")
         raise RuntimeError(
             "FreshX: could not trigger CSV download. "
-            "Check python/screenshots/10-download-dropdown*.png to see what "
+            "Check python/screenshots/freshx-10-download-dropdown*.png to see what "
             "the dropdown contains."
         )
 
