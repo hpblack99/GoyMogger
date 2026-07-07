@@ -440,41 +440,126 @@ class FreshXQuoter:
         except Exception:
             pass
 
-        self.page.wait_for_timeout(600)
+        self.page.wait_for_timeout(700)
         _screenshot(self.page, "10-download-dropdown")
 
-        # Reka UI menu items — "Export CSV" is the exact text from the DOM.
-        csv_selectors = [
+        # Log exactly what the dropdown contains so a UI/label change is
+        # obvious from the terminal (no need to open the screenshot).
+        self._log_menu_contents()
+
+        # Pick the menu item to click, most-specific first. We resolve to a
+        # single Locator so we can click it reliably.
+        candidate_selectors = [
             "[role='menuitem']:has-text('Export CSV')",
             "[data-reka-collection-item]:has-text('Export CSV')",
             "[role='menuitem']:has-text('CSV')",
             "[data-reka-collection-item]:has-text('CSV')",
+            "a:has-text('Export CSV')", "button:has-text('Export CSV')",
+            "a:has-text('CSV')", "button:has-text('CSV')",
             "[role='menuitem']:has-text('Export')",
-            "[role='menuitem']",  # last resort: first visible menu item
         ]
-        for sel in csv_selectors:
+        item = None
+        for sel in candidate_selectors:
             try:
-                for el in self.page.locator(sel).all():
-                    try:
-                        if el.is_visible(timeout=800):
-                            label = el.inner_text().strip()
-                            print(f"[FreshX]   Clicking menu item: '{label}'")
-                            with self.page.expect_download(timeout=30_000) as dl_info:
-                                el.click()
-                            dl_info.value.save_as(out_path)
-                            print(f"[FreshX]   Downloaded: {out_path}")
-                            return out_path
-                    except Exception:
-                        continue
+                loc = self.page.locator(sel).first
+                if loc.count() > 0 and loc.is_visible():
+                    item = loc
+                    print(f"[FreshX]   Menu item matched via: {sel}")
+                    break
             except Exception:
                 continue
 
-        # Close any dangling dropdown so it doesn't block the next attempt.
+        if item is None:
+            print("[FreshX]   No CSV menu item matched — dumping dropdown HTML.")
+            self._dump_menu_html()
+            try:
+                self.page.keyboard.press("Escape")
+            except Exception:
+                pass
+            return None
+
+        # "Export CSV" may (a) download directly, or (b) open the file in a new
+        # tab/popup. Watch for both.
+        try:
+            with self.page.expect_download(timeout=30_000) as dl_info:
+                item.click()
+            dl_info.value.save_as(out_path)
+            print(f"[FreshX]   Downloaded: {out_path}")
+            return out_path
+        except Exception as e_dl:
+            print(f"[FreshX]   No direct download from menu click ({str(e_dl)[:60]}); "
+                  "checking for a popup tab…")
+
+        # Fallback: the click may have opened the CSV in a new page.
+        try:
+            ctx = self.page.context
+            with ctx.expect_page(timeout=5_000) as pg_info:
+                item.click()
+            popup = pg_info.value
+            try:
+                with popup.expect_download(timeout=10_000) as dl_info:
+                    pass
+                dl_info.value.save_as(out_path)
+                print(f"[FreshX]   Downloaded via popup: {out_path}")
+                return out_path
+            except Exception:
+                # Popup rendered the CSV inline — read its body.
+                popup.wait_for_load_state("domcontentloaded", timeout=8_000)
+                body = popup.content()
+                popup.close()
+        except Exception:
+            pass
+
+        self._dump_menu_html()
         try:
             self.page.keyboard.press("Escape")
         except Exception:
             pass
         return None
+
+    def _menu_items(self):
+        """All visible dropdown item locators, across Reka/ARIA variants."""
+        out = []
+        for sel in ("[role='menuitem']", "[data-reka-collection-item]",
+                    "[role='menu'] a", "[role='menu'] button"):
+            try:
+                out.extend(self.page.locator(sel).all())
+            except Exception:
+                continue
+        return out
+
+    def _log_menu_contents(self) -> None:
+        seen = set()
+        labels = []
+        for el in self._menu_items():
+            try:
+                if not el.is_visible():
+                    continue
+                txt = " ".join(el.inner_text().split())
+                if txt and txt not in seen:
+                    seen.add(txt)
+                    labels.append(txt)
+            except Exception:
+                continue
+        if labels:
+            print(f"[FreshX]   Dropdown items: {labels}")
+        else:
+            print("[FreshX]   Dropdown appears empty (no menuitem/collection-item found).")
+
+    def _dump_menu_html(self) -> None:
+        """Save the open menu's HTML so we can see its exact structure."""
+        try:
+            html = self.page.evaluate(
+                """() => {
+                    const m = document.querySelector("[role='menu'], [data-reka-menu-content], [data-radix-menu-content]");
+                    return m ? m.outerHTML : document.body.innerHTML.slice(0, 4000);
+                }"""
+            )
+            path = SCREENSHOT_DIR / f"freshx-10-dropdown-{datetime.now().strftime('%H%M%S')}.html"
+            path.write_text(html, encoding="utf-8")
+            print(f"[FreshX]   Wrote dropdown HTML → {path}")
+        except Exception:
+            pass
 
 
 # ─────────────────────────────────────────────────────────────────────────────
