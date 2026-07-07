@@ -21,13 +21,60 @@ import signal
 import threading
 import traceback
 from datetime import datetime, timezone
+from pathlib import Path
 
-from dotenv import load_dotenv
-from supabase import create_client, Client
 
-from master_quoter import MasterQuoter
+def _fatal(msg: str) -> None:
+    """Print a clear, actionable startup error and exit — no cryptic traceback."""
+    print("\n" + "─" * 60)
+    print("[Worker] Cannot start:")
+    print(f"  {msg}")
+    print("─" * 60 + "\n")
+    sys.exit(1)
 
-load_dotenv()
+
+# ── Dependencies ──────────────────────────────────────────────────────────────
+# A missing package is the #1 reason the worker "won't start". Turn the raw
+# ModuleNotFoundError into a one-line fix.
+try:
+    from dotenv import load_dotenv
+    from supabase import create_client, Client
+except ModuleNotFoundError as e:
+    _fatal(
+        f"missing Python package '{e.name}'.\n"
+        "  Install the worker's dependencies from the python/ folder:\n"
+        "      pip install -r requirements.txt\n"
+        "  (If you use a virtualenv, activate it first.)"
+    )
+
+try:
+    from master_quoter import MasterQuoter
+except ModuleNotFoundError as e:
+    _fatal(
+        f"missing Python package '{e.name}' (needed by the quoter).\n"
+        "  Run:  pip install -r requirements.txt\n"
+        "  and:  python -m playwright install chromium"
+    )
+
+# ── Config from .env ──────────────────────────────────────────────────────────
+_ENV_PATH = Path(__file__).parent / ".env"
+if not _ENV_PATH.exists():
+    _fatal(
+        f"no .env file found at {_ENV_PATH}.\n"
+        "  Copy the template and fill in your values:\n"
+        "      cp .env.example .env      (then edit .env)"
+    )
+
+load_dotenv(_ENV_PATH)
+
+_REQUIRED = ["SUPABASE_URL", "SUPABASE_SERVICE_KEY", "FFE_USERNAME", "FFE_PASSWORD"]
+_missing = [k for k in _REQUIRED if not os.environ.get(k)]
+if _missing:
+    _fatal(
+        "these required values are missing (or blank) in python/.env:\n"
+        + "".join(f"      • {k}\n" for k in _missing)
+        + "  Fill them in — see .env.example for what each one is."
+    )
 
 SUPABASE_URL    = os.environ["SUPABASE_URL"]
 SUPABASE_KEY    = os.environ["SUPABASE_SERVICE_KEY"]
@@ -36,7 +83,11 @@ FFE_PASSWORD    = os.environ["FFE_PASSWORD"]
 FRESHX_USERNAME = os.environ.get("FRESHX_USERNAME", "")
 FRESHX_PASSWORD = os.environ.get("FRESHX_PASSWORD", "")
 DEBUG           = os.environ.get("DEBUG", "").lower() == "true"
-POLL_INTERVAL   = int(os.environ.get("POLL_INTERVAL", "5"))
+
+try:
+    POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "5"))
+except ValueError:
+    POLL_INTERVAL = 5
 
 # ── Graceful shutdown ─────────────────────────────────────────────────────────
 _shutdown = False
@@ -247,7 +298,26 @@ def process_job(sb: Client, job: dict) -> None:
 # ── Main loop ─────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    sb = create_client(SUPABASE_URL, SUPABASE_KEY)
+    try:
+        sb = create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception as e:
+        _fatal(f"could not create the Supabase client: {e}\n"
+               "  Check SUPABASE_URL is a full https URL and the key is valid.")
+
+    # Verify the connection + that the quote tables exist before we start polling,
+    # so a bad key or unapplied migration fails loudly here instead of silently.
+    try:
+        sb.table("quote_jobs").select("id").limit(1).execute()
+    except Exception as e:
+        msg = str(e)
+        if "quote_jobs" in msg and ("does not exist" in msg or "not find" in msg.lower()):
+            _fatal("connected to Supabase, but the 'quote_jobs' table was not found.\n"
+                   "  This project may be missing the reefer migrations, or "
+                   "SUPABASE_URL points at the wrong project.")
+        _fatal(f"could not reach Supabase with the given URL/key:\n  {msg}\n"
+               "  Verify SUPABASE_URL and SUPABASE_SERVICE_KEY in python/.env.")
+
+    print("[Worker] ✓ Connected to Supabase.")
 
     freshx_status = "✓ credentials set" if (FRESHX_USERNAME and FRESHX_PASSWORD) else "✗ not configured (FFE-only mode)"
     print("╔══════════════════════════════════════════════════════╗")
