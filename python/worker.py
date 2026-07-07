@@ -236,6 +236,20 @@ def process_job(sb: Client, job: dict) -> None:
             "done_rows": done, "updated_at": _now(),
         }).eq("id", job_id).execute()
 
+    def on_freshx_done(freshx_error: str | None, rates_obtained: int) -> None:
+        """Persist the FreshX outcome so the UI can explain empty FreshX columns."""
+        try:
+            sb.table("quote_jobs").update({
+                "freshx_error": (freshx_error or "")[:500] or None,
+                "updated_at": _now(),
+            }).eq("id", job_id).execute()
+        except Exception as e:
+            if "freshx_error" in str(e).lower():
+                print("[Worker] Note: quote_jobs.freshx_error column missing — "
+                      "apply migration 20260707000002 to surface FreshX errors in the UI.")
+            else:
+                print(f"[Worker] Could not record FreshX status: {e}")
+
     try:
         # Run MasterQuoter in a plain thread so Playwright's sync API is not
         # called from inside the asyncio event loop that supabase-py creates.
@@ -268,6 +282,7 @@ def process_job(sb: Client, job: dict) -> None:
                     accessorials    = accessorials,
                     on_row_start    = on_row_start,
                     on_row_done     = on_row_done,
+                    on_freshx_done  = on_freshx_done,
                 )
             except BaseException as e:
                 _exc.append(e)
