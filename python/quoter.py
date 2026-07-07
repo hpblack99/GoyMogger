@@ -159,38 +159,6 @@ class FFEQuoter:
         return self._page
 
     # ─────────────────────────────────────────────────────────────────────────
-    # Robust navigation
-    # ─────────────────────────────────────────────────────────────────────────
-
-    def _safe_goto(self, url: str, wait_for: str | None = None, attempts: int = 3) -> None:
-        """Navigate reliably.
-
-        FFE's pages pull in slow third-party scripts/images, so waiting for the
-        full 'load' event routinely times out even though the form we need is
-        already interactive (this is the "Page.goto: Timeout 30000ms exceeded
-        ... waiting until load" crash). We wait for 'domcontentloaded' and,
-        when given, for the specific element we're about to use — then retry a
-        couple of times before giving up.
-        """
-        last_err: Exception | None = None
-        for i in range(1, attempts + 1):
-            try:
-                self.page.goto(url, wait_until="domcontentloaded", timeout=45_000)
-                # If FFE bounced us to the login screen, stop here — waiting for
-                # the target page's field would (correctly) never resolve. The
-                # caller's _relogin_if_needed() will re-authenticate and retry.
-                if "/Account/Login" in self.page.url:
-                    return
-                if wait_for:
-                    self.page.wait_for_selector(wait_for, state="visible", timeout=20_000)
-                return
-            except Exception as e:
-                last_err = e
-                print(f"[FFE] goto {url} attempt {i}/{attempts} failed: {str(e)[:90]}")
-                self.page.wait_for_timeout(1_500)
-        raise RuntimeError(f"Navigation to {url} failed after {attempts} attempts: {last_err}")
-
-    # ─────────────────────────────────────────────────────────────────────────
     # Login
     # ─────────────────────────────────────────────────────────────────────────
 
@@ -218,7 +186,7 @@ class FFEQuoter:
         if self._is_browser_alive():
             # Browser is alive — just handle a possible login redirect
             if self._relogin_if_needed():
-                self._safe_goto(CONFIG["urls"]["rate_request"], wait_for=CONFIG["quote_form"]["origin_zip"])
+                self.page.goto(CONFIG["urls"]["rate_request"], wait_until="load", timeout=30_000)
             return
 
         # Browser process is gone — tear down and relaunch everything
@@ -241,17 +209,15 @@ class FFEQuoter:
         self._username = username
         self._password = password
         print("[FFE] Navigating to login page…")
-        self._safe_goto(CONFIG["urls"]["login"], wait_for=CONFIG["login"]["username"])
+        self.page.goto(CONFIG["urls"]["login"], wait_until="load", timeout=30_000)
         _screenshot(self.page, "01-login-page")
 
         self.page.fill(CONFIG["login"]["username"], username)
         self.page.fill(CONFIG["login"]["password"], password)
         _screenshot(self.page, "02-credentials-filled")
 
-        with self.page.expect_navigation(wait_until="domcontentloaded", timeout=30_000):
+        with self.page.expect_navigation(wait_until="load", timeout=30_000):
             self.page.click(CONFIG["login"]["submit"])
-        # Settle briefly so any post-login redirect resolves before we check URL.
-        self.page.wait_for_timeout(1_000)
 
         _screenshot(self.page, "03-after-login")
 
@@ -271,12 +237,12 @@ class FFEQuoter:
 
     def navigate_to_rate_request(self) -> None:
         print("[FFE] Navigating to Rate Request…")
-        self._safe_goto(CONFIG["urls"]["rate_request"])
+        self.page.goto(CONFIG["urls"]["rate_request"], wait_until="load", timeout=30_000)
         _screenshot(self.page, "04-rate-request")
 
         if self._relogin_if_needed():
             # After re-login, navigate again
-            self._safe_goto(CONFIG["urls"]["rate_request"])
+            self.page.goto(CONFIG["urls"]["rate_request"], wait_until="load", timeout=30_000)
 
         # Verify the form is present
         origin_el = self.page.query_selector(CONFIG["quote_form"]["origin_zip"])
@@ -298,15 +264,14 @@ class FFEQuoter:
         row keys: origin_zip, dest_zip, weight, freight_class, pieces (optional), row_index
         Returns: {rate, transit_days, quote_number}  — any field may be None on parse failure
         """
-        cfg = CONFIG["quote_form"]
-
-        # Fresh form for every quote — wait for the origin field, not the full
-        # 'load' event (which stalls on FFE's slow third-party assets).
-        self._safe_goto(CONFIG["urls"]["rate_request"], wait_for=cfg["origin_zip"])
+        # Fresh form for every quote
+        self.page.goto(CONFIG["urls"]["rate_request"], wait_until="load", timeout=30_000)
 
         # Re-login if session expired between quotes, then reload the form page
         if self._relogin_if_needed():
-            self._safe_goto(CONFIG["urls"]["rate_request"], wait_for=cfg["origin_zip"])
+            self.page.goto(CONFIG["urls"]["rate_request"], wait_until="load", timeout=30_000)
+
+        cfg = CONFIG["quote_form"]
 
         # ── Origin / destination ──────────────────────────────────────────────────────
         origin_zip_padded = str(row["origin_zip"]).strip().zfill(5)
@@ -363,7 +328,7 @@ class FFEQuoter:
             print(f"  [FFE] Submit click {click_num}/{MAX_CLICKS}")
             wait_ms = 60_000 if click_num == MAX_CLICKS else 6_000
             try:
-                self.page.wait_for_url("**/RateResult**", wait_until="domcontentloaded", timeout=wait_ms)
+                self.page.wait_for_url("**/RateResult**", wait_until="load", timeout=wait_ms)
                 break  # navigation confirmed — done
             except Exception:
                 # Load timed out — check URL directly before retrying.

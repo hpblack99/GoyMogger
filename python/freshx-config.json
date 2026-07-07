@@ -21,8 +21,6 @@
     "_comment": "Header row written to the bulk-upload CSV. Edit if FreshX changes its template.",
     "columns": ["external_id", "from_zip", "to_zip", "pallets", "gross_weight", "temperature", "commodity", "is_stackable"]
   },
-  "_history_note": "Selectors for one row in the search-history list, tried in order. FreshX may render a <table>, an ARIA grid, or a div list.",
-  "history_row_selectors": ["table tbody tr", "[role='row']", "[role='rowgroup'] > div"],
   "results_csv": {
     "rate_columns":    ["total rate", "rate", "price", "total_price", "total_charge", "quoted_rate", "best_rate", "amount", "cost", "net_charge"],
     "carrier_columns": ["carrier", "carrier_name", "provider", "scac", "carrier_scac", "carrier_id"],

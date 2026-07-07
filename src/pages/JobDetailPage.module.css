@@ -33,8 +33,6 @@
 .jobDate  { font-size: 0.85rem; color: var(--color-neutral-500); }
 .jobError { font-size: 0.85rem; color: var(--color-error-600); background: rgba(239,68,68,0.06); padding: 8px 12px; border-radius: 6px; max-width: 500px; }
 
-.freshxError { font-size: 0.85rem; color: var(--color-warning-500); background: rgba(245,158,11,0.08); padding: 8px 12px; border-radius: 6px; max-width: 560px; margin-top: 6px; }
-
 .headerActions { display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
 
 /* ── Stats row ── */
