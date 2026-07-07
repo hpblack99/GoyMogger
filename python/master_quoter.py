@@ -86,14 +86,18 @@ class MasterQuoter:
         accessorials: list[str] | None = None,
         on_row_start: Callable[[str], None] | None = None,
         on_row_done: Callable[[str, dict, str | None], None] | None = None,
+        on_freshx_done: Callable[[str | None, int], None] | None = None,
     ) -> None:
         """
         Runs FreshX bulk quote (if configured) then FFE row-by-row.
         Calls on_row_start(row_id) before each FFE quote.
         Calls on_row_done(row_id, collated_result, error) after each row.
+        Calls on_freshx_done(error_or_None, rates_obtained) after the FreshX
+        phase so failures surface in the UI instead of only the terminal.
         """
         # ── Step 1: FreshX bulk ───────────────────────────────────────────────
         freshx_results: dict[int, dict] = {}
+        freshx_error: str | None = None
         can_freshx = bool(freshx_username and freshx_password and temperature and commodity)
 
         if can_freshx:
@@ -106,7 +110,13 @@ class MasterQuoter:
                     )
                 got = len([r for r in freshx_results.values() if r.get("freshx_rate")])
                 print(f"[Master] FreshX: {got}/{len(rows)} rates obtained.")
+                if got == 0:
+                    freshx_error = (
+                        f"FreshX returned no rates for any of the {len(rows)} lanes "
+                        "(carriers declined or lanes out of network)."
+                    )
             except Exception as e:
+                freshx_error = str(e)
                 print(f"[Master] FreshX FAILED: {e}")
                 print("[Master] Continuing with FFE only.")
         else:
@@ -115,6 +125,10 @@ class MasterQuoter:
             if not temperature:     reasons.append("temperature not selected")
             if not commodity:       reasons.append("commodity not selected")
             print(f"[Master] Skipping FreshX ({'; '.join(reasons) or 'not configured'}).")
+
+        if can_freshx and on_freshx_done:
+            got = len([r for r in freshx_results.values() if r.get("freshx_rate")])
+            on_freshx_done(freshx_error, got)
 
         row_id_to_index = {r["id"]: r["row_index"] for r in rows}
 

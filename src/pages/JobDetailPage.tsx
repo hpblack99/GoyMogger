@@ -18,6 +18,7 @@ interface QuoteJob {
   temperature?:  string
   commodity?:    string
   is_stackable?: boolean
+  freshx_error?: string
 }
 
 interface QuoteRow {
@@ -296,6 +297,11 @@ export default function JobDetailPage() {
             </div>
             <p className={styles.jobDate}>Submitted {fmtDate(job_.created_at)}</p>
             {job_.error && <p className={styles.jobError}>{job_.error}</p>}
+            {job_.freshx_error && (
+              <p className={styles.freshxError}>
+                ⚠ FreshX: {job_.freshx_error} — FFE rates are unaffected.
+              </p>
+            )}
           </div>
 
           <div className={styles.headerActions}>
